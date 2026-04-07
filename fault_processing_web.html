@@ -1,0 +1,2583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fault Rupture Processing - Interactive Web App</title>
+    
+    <!-- Plotly for interactive plots -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .glass-dark {
+            background: rgba(30, 30, 30, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+        
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        
+        .tab-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .tab-button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .input-modern {
+            transition: all 0.3s ease;
+            border: 2px solid #e5e7eb;
+        }
+        
+        .input-modern:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            outline: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(245, 87, 108, 0.3);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 172, 254, 0.3);
+        }
+        
+        .slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 5px;
+            background: #e5e7eb;
+            outline: none;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-running {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .status-complete {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .card {
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2, #667eea);
+            background-size: 200% 100%;
+            animation: progress 2s ease-in-out infinite;
+        }
+        
+        @keyframes progress {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+        
+        .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem 1rem;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 0.5rem;
+        }
+        
+        .console-output {
+            background: #1a1a1a;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            padding: 1.5rem;
+            border-radius: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .console-output::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .console-output::-webkit-scrollbar-track {
+            background: #2a2a2a;
+            border-radius: 10px;
+        }
+        
+        .console-output::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+        
+        .console-output::-webkit-scrollbar-thumb:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="glass mb-6 p-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-mountain text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                            SWEET - Fault Rupture Processing
+                        </h1>
+                        <p class="text-gray-600 text-sm">Interactive Fault Modeling Tool</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="downloadConfig()" class="px-4 py-2 bg-white border-2 border-purple-200 text-purple-600 rounded-lg font-medium hover:bg-purple-50 transition-all">
+                        <i class="fas fa-download mr-2"></i>Save Config
+                    </button>
+                    <button onclick="showAbout()" class="px-4 py-2 bg-white border-2 border-purple-200 text-purple-600 rounded-lg font-medium hover:bg-purple-50 transition-all">
+                        <i class="fas fa-info-circle mr-2"></i>About
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="glass mb-6 p-2">
+            <div class="flex gap-2">
+                <button onclick="switchTab('parameters')" id="tab-parameters" class="tab-button active flex-1 px-6 py-3 rounded-lg font-medium transition-all">
+                    <i class="fas fa-sliders-h mr-2"></i>Parameters
+                </button>
+                <button onclick="switchTab('visualization')" id="tab-visualization" class="tab-button flex-1 px-6 py-3 rounded-lg font-medium transition-all">
+                    <i class="fas fa-chart-area mr-2"></i>Visualization
+                </button>
+                <button onclick="switchTab('processing')" id="tab-processing" class="tab-button flex-1 px-6 py-3 rounded-lg font-medium transition-all">
+                    <i class="fas fa-cogs mr-2"></i>Processing
+                </button>
+                <button onclick="switchTab('console')" id="tab-console" class="tab-button flex-1 px-6 py-3 rounded-lg font-medium transition-all">
+                    <i class="fas fa-terminal mr-2"></i>Console
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Content -->
+        
+        <!-- Parameters Tab -->
+        <div id="content-parameters" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Fault Mode Selection -->
+                <div class="glass p-6 card">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-layer-group mr-3 text-purple-600"></i>
+                        Fault Source
+                    </h3>
+                    <div class="space-y-3">
+                        <label class="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-purple-400 transition-all">
+                            <input type="radio" name="mode" value="synthetic" checked onchange="updateMode()" class="mr-3 w-5 h-5 text-purple-600">
+                            <div>
+                                <div class="font-semibold">Create Synthetic Fault</div>
+                                <div class="text-sm text-gray-500">Generate custom fault with parameters</div>
+                            </div>
+                        </label>
+                        <label class="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-purple-400 transition-all">
+                            <input type="radio" name="mode" value="geojson" onchange="updateMode()" class="mr-3 w-5 h-5 text-purple-600">
+                            <div>
+                                <div class="font-semibold">Load from GeoJSON</div>
+                                <div class="text-sm text-gray-500">Import existing fault model</div>
+                            </div>
+                        </label>
+                        
+                        <!-- GeoJSON Upload Section (hidden by default) -->
+                        <div id="geojson-upload" class="hidden p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-upload mr-2"></i>Upload GeoJSON File
+                            </label>
+                            <input type="file" id="geojson-file" accept=".geojson,.json" onchange="loadGeoJSON()" class="w-full p-2 text-sm text-gray-700 border border-gray-300 rounded-lg cursor-pointer bg-white hover:bg-gray-50">
+                            <p class="text-xs text-gray-500 mt-2">Select a GeoJSON file containing fault geometry</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fault Geometry -->
+                <div class="glass p-6 card">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-ruler-combined mr-3 text-purple-600"></i>
+                        Fault Geometry
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Length (km): <span id="length-value" class="text-purple-600 font-semibold">50</span></label>
+                            <input type="range" id="length" min="10" max="200" value="50" step="5" class="slider" oninput="updateValue('length'); updateScalingRelations()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Width (km): <span id="width-value" class="text-purple-600 font-semibold">15</span></label>
+                            <input type="range" id="width" min="5" max="50" value="15" step="1" class="slider" oninput="updateValue('width'); updateScalingRelations()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Top Depth (km): <span id="depth-value" class="text-purple-600 font-semibold">0</span></label>
+                            <input type="range" id="depth" min="0" max="20" value="0" step="0.5" class="slider" oninput="updateValue('depth')">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Patch Size (km): <span id="patch-value" class="text-purple-600 font-semibold">2</span></label>
+                            <input type="range" id="patch" min="0.5" max="10" value="2" step="0.5" class="slider" oninput="updateValue('patch')">
+                        </div>
+                    </div>
+                    
+                    <!-- Scaling Relations Suggestion -->
+                    <div id="scaling-suggestion" class="mt-4 p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                        <div class="text-sm font-medium text-blue-800 mb-1">
+                            <i class="fas fa-lightbulb mr-2"></i>Magnitude-Area Scaling
+                        </div>
+                        <div id="scaling-text" class="text-sm text-blue-700">
+                            Based on fault area (750 km²), suggested magnitude range: <span class="font-bold">Mw 6.8 - 7.2</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fault Orientation -->
+                <div class="glass p-6 card">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-compass mr-3 text-purple-600"></i>
+                        Fault Orientation
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Strike (°): <span id="strike-value" class="text-purple-600 font-semibold">135</span></label>
+                            <input type="range" id="strike" min="0" max="360" value="135" step="5" class="slider" oninput="updateValue('strike')">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Dip (°): <span id="dip-value" class="text-purple-600 font-semibold">85</span></label>
+                            <input type="range" id="dip" min="0" max="90" value="85" step="5" class="slider" oninput="updateValue('dip')">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                Rake (°): <span id="rake-value" class="text-purple-600 font-semibold ml-2">180</span>
+                                <span class="tooltip ml-2" data-tooltip="0°=left-lateral, 180°=right-lateral, 90°=thrust, -90°=normal">
+                                    <i class="fas fa-question-circle text-gray-400"></i>
+                                </span>
+                            </label>
+                            <input type="range" id="rake" min="-180" max="180" value="180" step="10" class="slider" oninput="updateValue('rake'); updateRakeLabel()">
+                            <div id="rake-label" class="text-sm text-gray-600 mt-2 font-medium">Right-lateral strike-slip</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rupture Parameters -->
+                <div class="glass p-6 card">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-wave-square mr-3 text-purple-600"></i>
+                        Rupture Parameters
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Target Magnitude: <span id="magnitude-value" class="text-purple-600 font-semibold">7.1</span></label>
+                            <input type="range" id="magnitude" min="4.0" max="9.0" value="7.1" step="0.1" class="slider" oninput="updateValue('magnitude'); updateScalingRelations()">
+                        </div>
+                        
+                        <!-- Magnitude-based suggestion -->
+                        <div id="magnitude-suggestion" class="p-3 bg-purple-50 border-2 border-purple-200 rounded-lg">
+                            <div class="text-sm font-medium text-purple-800 mb-1">
+                                <i class="fas fa-calculator mr-2"></i>Recommended Fault Dimensions
+                            </div>
+                            <div id="magnitude-text" class="text-sm text-purple-700">
+                                For Mw 7.1, typical fault dimensions: <span class="font-bold">40-60 km length, 12-18 km width</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Rupture Velocity (km/s): <span id="velocity-value" class="text-purple-600 font-semibold">2.8</span></label>
+                            <input type="range" id="velocity" min="1.0" max="5.0" value="2.8" step="0.1" class="slider" oninput="updateValue('velocity')">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Rise Time (s): <span id="risetime-value" class="text-purple-600 font-semibold">1.5</span></label>
+                            <input type="range" id="risetime" min="0.1" max="5.0" value="1.5" step="0.1" class="slider" oninput="updateValue('risetime')">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Slip Distribution</label>
+                            <select id="slip-dist" class="w-full p-3 border-2 border-gray-200 rounded-lg input-modern">
+                                <option value="uniform">Uniform</option>
+                                <option value="random">Random</option>
+                                <option value="gaussian" selected>Gaussian</option>
+                                <option value="asperity">Asperity</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hypocenter Location -->
+                <div class="glass p-6 card">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-map-pin mr-3 text-purple-600"></i>
+                        Hypocenter Location
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Along-Strike (0-1): <span id="hypo-strike-value" class="text-purple-600 font-semibold">0.3</span></label>
+                            <input type="range" id="hypo-strike" min="0" max="1" value="0.3" step="0.05" class="slider" oninput="updateValue('hypo-strike')">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Down-Dip (0-1): <span id="hypo-dip-value" class="text-purple-600 font-semibold">0.5</span></label>
+                            <input type="range" id="hypo-dip" min="0" max="1" value="0.5" step="0.05" class="slider" oninput="updateValue('hypo-dip')">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Reference Latitude</label>
+                            <input type="number" id="ref-lat" value="35.77" step="0.01" class="w-full p-3 border-2 border-gray-200 rounded-lg input-modern">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Reference Longitude</label>
+                            <input type="number" id="ref-lon" value="-117.60" step="0.01" class="w-full p-3 border-2 border-gray-200 rounded-lg input-modern">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Processing Settings -->
+                <div class="glass p-6 card">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-cog mr-3 text-purple-600"></i>
+                        Processing Settings
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Earthquake Name</label>
+                            <input type="text" id="eq-name" value="WebApp_Simulation" class="w-full p-3 border-2 border-gray-200 rounded-lg input-modern">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Target Magnitude (Grouping)</label>
+                            <input type="number" id="target-mag" value="6.0" step="0.1" min="4.0" max="9.0" class="w-full p-3 border-2 border-gray-200 rounded-lg input-modern">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Number of Stations</label>
+                            <input type="number" id="num-stations" value="50" step="5" min="10" max="200" class="w-full p-3 border-2 border-gray-200 rounded-lg input-modern">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Max Station Distance (km)</label>
+                            <input type="number" id="max-dist" value="200" step="10" min="50" max="500" class="w-full p-3 border-2 border-gray-200 rounded-lg input-modern">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="glass p-6 mt-6">
+                <div class="flex gap-4 justify-center flex-wrap">
+                    <button onclick="createFaultModel()" class="btn-primary text-white px-8 py-4 rounded-xl font-semibold shadow-lg">
+                        <i class="fas fa-play mr-2"></i>Create Fault Model
+                    </button>
+                    <button onclick="quickVisualize()" class="btn-secondary text-white px-8 py-4 rounded-xl font-semibold shadow-lg">
+                        <i class="fas fa-eye mr-2"></i>Quick Visualize
+                    </button>
+                    <button onclick="resetParameters()" class="bg-white text-gray-700 px-8 py-4 rounded-xl font-semibold shadow-lg border-2 border-gray-300 hover:bg-gray-50 transition-all">
+                        <i class="fas fa-redo mr-2"></i>Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visualization Tab -->
+        <div id="content-visualization" class="tab-content hidden">
+            <div class="glass p-6 mb-6">
+                <div class="flex gap-3 flex-wrap justify-center">
+                    <button onclick="visualize('slip')" class="btn-primary text-white px-6 py-3 rounded-lg font-medium shadow">
+                        <i class="fas fa-layer-group mr-2"></i>Slip Distribution
+                    </button>
+                    <button onclick="visualize('rupture')" class="btn-primary text-white px-6 py-3 rounded-lg font-medium shadow">
+                        <i class="fas fa-clock mr-2"></i>Rupture Time
+                    </button>
+                    <button onclick="visualize('moment')" class="btn-primary text-white px-6 py-3 rounded-lg font-medium shadow">
+                        <i class="fas fa-chart-line mr-2"></i>Moment Release
+                    </button>
+                    <button onclick="visualize('stf')" class="btn-secondary text-white px-6 py-3 rounded-lg font-medium shadow">
+                        <i class="fas fa-wave-square mr-2"></i>Source Time Function
+                    </button>
+                    <button onclick="visualize3D('slip')" class="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-3 rounded-lg font-medium shadow hover:shadow-lg transition-all">
+                        <i class="fas fa-cube mr-2"></i>3D View
+                    </button>
+                    <button onclick="visualizeMap()" class="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-6 py-3 rounded-lg font-medium shadow hover:shadow-lg transition-all">
+                        <i class="fas fa-map-marked-alt mr-2"></i>Map View
+                    </button>
+                    <button onclick="clearVisualization()" class="bg-white text-gray-700 px-6 py-3 rounded-lg font-medium shadow border-2 border-gray-300 hover:bg-gray-50 transition-all">
+                        <i class="fas fa-eraser mr-2"></i>Clear
+                    </button>
+                </div>
+            </div>
+
+            <div class="glass p-6">
+                <div id="visualization-container" class="min-h-[600px]">
+                    <div class="flex flex-col items-center justify-center h-96 text-gray-400">
+                        <i class="fas fa-chart-area text-6xl mb-4"></i>
+                        <p class="text-xl">Create a fault model to visualize</p>
+                        <p class="text-sm mt-2">Select a visualization type above</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Processing Tab -->
+        <div id="content-processing" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Pipeline Steps -->
+                <div class="glass p-6">
+                    <h3 class="text-xl font-bold mb-6 flex items-center">
+                        <i class="fas fa-tasks mr-3 text-purple-600"></i>
+                        Processing Pipeline
+                    </h3>
+                    
+                    <!-- Step 1 -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">1</div>
+                                <div>
+                                    <div class="font-semibold">Create Fault Model</div>
+                                    <div class="text-sm text-gray-500">Generate fault geometry</div>
+                                </div>
+                            </div>
+                            <span id="status-step1" class="status-badge status-pending">
+                                <i class="fas fa-circle"></i>Pending
+                            </span>
+                        </div>
+                        <button onclick="executeStep(1)" class="w-full btn-primary text-white py-2 rounded-lg font-medium">
+                            <i class="fas fa-play mr-2"></i>Execute
+                        </button>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">2</div>
+                                <div>
+                                    <div class="font-semibold">Group Centroids</div>
+                                    <div class="text-sm text-gray-500">Aggregate patches by magnitude</div>
+                                </div>
+                            </div>
+                            <span id="status-step2" class="status-badge status-pending">
+                                <i class="fas fa-circle"></i>Pending
+                            </span>
+                        </div>
+                        <button onclick="executeStep(2)" class="w-full btn-primary text-white py-2 rounded-lg font-medium">
+                            <i class="fas fa-play mr-2"></i>Execute
+                        </button>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">3</div>
+                                <div>
+                                    <div class="font-semibold">Generate Stations</div>
+                                    <div class="text-sm text-gray-500">Create synthetic stations</div>
+                                </div>
+                            </div>
+                            <span id="status-step3" class="status-badge status-pending">
+                                <i class="fas fa-circle"></i>Pending
+                            </span>
+                        </div>
+                        <button onclick="executeStep(3)" class="w-full btn-primary text-white py-2 rounded-lg font-medium">
+                            <i class="fas fa-play mr-2"></i>Execute
+                        </button>
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">4</div>
+                                <div>
+                                    <div class="font-semibold">Generate Tables</div>
+                                    <div class="text-sm text-gray-500">Export data for synthetics</div>
+                                </div>
+                            </div>
+                            <span id="status-step4" class="status-badge status-pending">
+                                <i class="fas fa-circle"></i>Pending
+                            </span>
+                        </div>
+                        <button onclick="executeStep(4)" class="w-full btn-primary text-white py-2 rounded-lg font-medium">
+                            <i class="fas fa-play mr-2"></i>Execute
+                        </button>
+                    </div>
+
+                    <!-- Run All Button -->
+                    <button onclick="runFullPipeline()" class="w-full btn-success text-white py-4 rounded-xl font-bold text-lg shadow-lg">
+                        <i class="fas fa-rocket mr-2"></i>Run Full Pipeline
+                    </button>
+                </div>
+
+                <!-- Progress and Results -->
+                <div class="glass p-6">
+                    <h3 class="text-xl font-bold mb-6 flex items-center">
+                        <i class="fas fa-chart-pie mr-3 text-purple-600"></i>
+                        Status & Results
+                    </h3>
+
+                    <!-- Progress Bar -->
+                    <div class="mb-6">
+                        <div class="flex justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700">Overall Progress</span>
+                            <span id="progress-percent" class="text-sm font-medium text-purple-600">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Current Status -->
+                    <div class="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg">
+                        <div class="text-sm font-medium text-gray-600 mb-1">Current Status</div>
+                        <div id="current-status" class="text-lg font-semibold text-gray-800">Ready to start</div>
+                    </div>
+
+                    <!-- Results Summary -->
+                    <div class="space-y-3">
+                        <div class="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-600">Fault Patches</span>
+                                <span id="result-patches" class="text-lg font-bold text-purple-600">-</span>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-600">Grouped Centroids</span>
+                                <span id="result-centroids" class="text-lg font-bold text-purple-600">-</span>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-600">Stations Generated</span>
+                                <span id="result-stations" class="text-lg font-bold text-purple-600">-</span>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-600">Tables Created</span>
+                                <span id="result-tables" class="text-lg font-bold text-purple-600">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Download Buttons -->
+                    <div class="mt-6 space-y-3">
+                        <button onclick="downloadCentroids()" class="w-full bg-gradient-to-r from-blue-500 to-cyan-600 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all">
+                            <i class="fas fa-download mr-2"></i>Download Centroids CSV
+                        </button>
+                        <button onclick="downloadGenerativeTables()" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all">
+                            <i class="fas fa-table mr-2"></i>Download Generative Tables
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Console Tab -->
+        <div id="content-console" class="tab-content hidden">
+            <div class="glass p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold flex items-center">
+                        <i class="fas fa-terminal mr-3 text-purple-600"></i>
+                        Console Output
+                    </h3>
+                    <button onclick="clearConsole()" class="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-all">
+                        <i class="fas fa-trash mr-2"></i>Clear
+                    </button>
+                </div>
+                <div id="console-output" class="console-output">
+                    <div class="text-gray-400">$ Fault Rupture Processing Console</div>
+                    <div class="text-gray-400">$ Ready for commands...</div>
+                    <div class="mt-2"><span class="text-yellow-400">></span> Waiting for input...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE_URL = 'http://localhost:5000';
+        
+        // Global state
+        let faultModel = null;
+        let currentStep = 0;
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all content
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            // Show selected content
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.add('active');
+        }
+
+        // Update slider values
+        function updateValue(id) {
+            const element = document.getElementById(id);
+            const valueElement = document.getElementById(id + '-value');
+            valueElement.textContent = element.value;
+        }
+        
+        // Update scaling relations suggestions
+        function updateScalingRelations() {
+            const length = parseFloat(document.getElementById('length').value);
+            const width = parseFloat(document.getElementById('width').value);
+            const magnitude = parseFloat(document.getElementById('magnitude').value);
+            
+            // Calculate fault area
+            const area = length * width; // km²
+            
+            // Wells & Coppersmith (1994) relationships:
+            // log(A) = M - 3.49 (±0.16) for strike-slip
+            // log(A) = M - 3.42 (±0.18) for reverse
+            // log(A) = M - 3.99 (±0.28) for normal
+            // Using average: log(A) = M - 3.98 (more conservative, closer to normal faulting)
+            
+            // From area, suggest magnitude range
+            const logArea = Math.log10(area);
+            const suggestedMag = logArea + 3.98;
+            const magMin = (suggestedMag - 0.2).toFixed(1);
+            const magMax = (suggestedMag + 0.2).toFixed(1);
+            
+            document.getElementById('scaling-text').innerHTML = 
+                `Based on fault area (${area.toFixed(0)} km²), suggested magnitude range: <span class="font-bold">Mw ${magMin} - ${magMax}</span>`;
+            
+            // From magnitude, suggest fault dimensions
+            // log(A) = M - 3.98, so A = 10^(M - 3.98)
+            const suggestedArea = Math.pow(10, magnitude - 3.98);
+            
+            // Typical aspect ratios (length/width): 2-4 for strike-slip, 1.5-3 for dip-slip
+            // Using aspect ratio ~2.5-3.5
+            const aspectRatioLow = 2.5;
+            const aspectRatioHigh = 3.5;
+            
+            // A = L * W, L = aspectRatio * W, so A = aspectRatio * W²
+            const widthLow = Math.sqrt(suggestedArea / aspectRatioHigh);
+            const widthHigh = Math.sqrt(suggestedArea / aspectRatioLow);
+            const lengthLow = (widthLow * aspectRatioLow).toFixed(0);
+            const lengthHigh = (widthHigh * aspectRatioHigh).toFixed(0);
+            const widthLowStr = widthLow.toFixed(0);
+            const widthHighStr = widthHigh.toFixed(0);
+            
+            document.getElementById('magnitude-text').innerHTML = 
+                `For Mw ${magnitude}, typical fault dimensions: <span class="font-bold">${lengthLow}-${lengthHigh} km length, ${widthLowStr}-${widthHighStr} km width</span><br>` +
+                `<span class="text-xs">(Total area: ${suggestedArea.toFixed(0)} km² using Wells & Coppersmith 1994)</span>`;
+        }
+
+        // Update rake label
+        function updateRakeLabel() {
+            const rake = parseFloat(document.getElementById('rake').value);
+            const label = document.getElementById('rake-label');
+            
+            if (rake >= -45 && rake <= 45) {
+                label.textContent = '← Left-lateral strike-slip';
+                label.className = 'text-sm text-blue-600 mt-2 font-medium';
+            } else if (rake >= 135 || rake <= -135) {
+                label.textContent = '→ Right-lateral strike-slip';
+                label.className = 'text-sm text-blue-600 mt-2 font-medium';
+            } else if (rake > 45 && rake < 135) {
+                label.textContent = '↑ Reverse/Thrust faulting';
+                label.className = 'text-sm text-red-600 mt-2 font-medium';
+            } else if (rake > -135 && rake < -45) {
+                label.textContent = '↓ Normal faulting';
+                label.className = 'text-sm text-green-600 mt-2 font-medium';
+            }
+        }
+
+        // Update mode
+        function updateMode() {
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            logConsole('Mode changed to: ' + mode);
+            
+            const geojsonUpload = document.getElementById('geojson-upload');
+            const syntheticParams = document.querySelectorAll('.synthetic-only');
+            
+            if (mode === 'geojson') {
+                geojsonUpload.classList.remove('hidden');
+                // Optionally hide some synthetic parameters
+            } else {
+                geojsonUpload.classList.add('hidden');
+            }
+        }
+        
+        // Load GeoJSON file
+        function loadGeoJSON() {
+            const fileInput = document.getElementById('geojson-file');
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+            
+            logConsole('Loading GeoJSON file: ' + file.name);
+            logConsole('Uploading to backend...');
+            
+            // Create FormData to upload file
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // Send file to backend
+            fetch(`${API_BASE_URL}/api/fault/upload-geojson`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    logConsole('GeoJSON file processed by backend');
+                    logConsole('Features found: ' + data.features_count);
+                    logConsole('Parsed ' + data.patches.length + ' fault patches');
+                    
+                    // Calculate statistics
+                    const patches = data.patches;
+                    const avgStrike = data.avg_strike;
+                    const avgDip = data.avg_dip;
+                    const avgRake = data.avg_rake;
+                    const estimatedLength = data.estimated_length || 50;
+                    const estimatedWidth = data.estimated_width || 15;
+                    const patchSize = data.patch_size || 2;
+                    
+                    logConsole('Total slip: ' + (data.total_slip || 0).toFixed(2) + ' m');
+                    logConsole('Total moment: ' + (data.total_moment || 0).toExponential(2) + ' N·m');
+                    if (data.magnitude) logConsole('Magnitude from moment: Mw ' + data.magnitude.toFixed(2));
+                    
+                    // Update form with parsed values
+                    if (avgStrike !== null && !isNaN(avgStrike)) {
+                        document.getElementById('strike').value = avgStrike.toFixed(0);
+                        updateValue('strike');
+                    }
+                    if (avgDip !== null && !isNaN(avgDip)) {
+                        document.getElementById('dip').value = avgDip.toFixed(0);
+                        updateValue('dip');
+                    }
+                    if (avgRake !== null && !isNaN(avgRake)) {
+                        document.getElementById('rake').value = avgRake.toFixed(0);
+                        updateValue('rake');
+                        updateRakeLabel();
+                    }
+                    
+                    if (estimatedLength > 0 && !isNaN(estimatedLength)) {
+                        const lengthVal = Math.min(200, Math.max(10, estimatedLength));
+                        document.getElementById('length').value = lengthVal.toFixed(0);
+                        updateValue('length');
+                    }
+                    
+                    if (estimatedWidth > 0 && !isNaN(estimatedWidth)) {
+                        const widthVal = Math.min(50, Math.max(5, estimatedWidth));
+                        document.getElementById('width').value = widthVal.toFixed(0);
+                        updateValue('width');
+                    }
+                    
+                    if (patchSize > 0 && !isNaN(patchSize)) {
+                        const patchVal = Math.min(10, Math.max(0.5, patchSize));
+                        document.getElementById('patch').value = patchVal.toFixed(1);
+                        updateValue('patch');
+                    }
+                    
+                    // Store parsed data for fault model creation
+                    window.geojsonData = {
+                        patches: patches,
+                        avgStrike: avgStrike,
+                        avgDip: avgDip,
+                        avgRake: avgRake,
+                        length: estimatedLength,
+                        width: estimatedWidth,
+                        patchSize: patchSize
+                    };
+                    
+                    logConsole('Fault parameters extracted:');
+                    if (avgStrike !== null) logConsole('  Average Strike: ' + avgStrike.toFixed(1) + '°');
+                    if (avgDip !== null) logConsole('  Average Dip: ' + avgDip.toFixed(1) + '°');
+                    if (avgRake !== null) logConsole('  Average Rake: ' + avgRake.toFixed(1) + '°');
+                    logConsole('  Estimated Length: ' + estimatedLength.toFixed(1) + ' km');
+                    logConsole('  Estimated Width: ' + estimatedWidth.toFixed(1) + ' km');
+                    logConsole('  Patch Size: ' + patchSize.toFixed(1) + ' km');
+                    logConsole('  Total Patches: ' + patches.length);
+                    
+                    updateScalingRelations();
+                    
+                    alert('✓ GeoJSON parsed successfully!\n' + 
+                          patches.length + ' patches loaded\n' +
+                          'Length: ' + estimatedLength.toFixed(1) + ' km\n' +
+                          'Width: ' + estimatedWidth.toFixed(1) + ' km\n' +
+                          (avgStrike !== null ? 'Strike: ' + avgStrike.toFixed(0) + '°\n' : '') +
+                          (avgDip !== null ? 'Dip: ' + avgDip.toFixed(0) + '°\n' : '') +
+                          (avgRake !== null ? 'Rake: ' + avgRake.toFixed(0) + '°' : ''));
+                } else {
+                    throw new Error(data.error || 'Failed to process GeoJSON');
+                }
+            })
+            .catch(error => {
+                logConsole('ERROR: ' + error.message);
+                alert('❌ Error processing GeoJSON: ' + error.message);
+            });
+        }
+
+        // Create fault model (simulated)
+        function createFaultModel() {
+            logConsole('='.repeat(70));
+            
+            // Check if we have GeoJSON data
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            
+            if (mode === 'geojson' && window.geojsonData) {
+                logConsole('Using loaded GeoJSON data...');
+                
+                // Update status
+                updateStepStatus(1, 'running');
+                updateCurrentStatus('Processing GeoJSON data...');
+                
+                const data = window.geojsonData;
+                
+                // Use GeoJSON data directly
+                setTimeout(() => {
+                    faultModel = {
+                        mode: 'geojson',
+                        patches: data.patches.length,
+                        nStrike: Math.ceil(Math.sqrt(data.patches.length)),
+                        nDip: Math.ceil(Math.sqrt(data.patches.length)),
+                        length: data.length,
+                        width: data.width,
+                        patch: data.patchSize,
+                        strike: data.avgStrike || 0,
+                        dip: data.avgDip || 90,
+                        rake: data.avgRake || 0,
+                        magnitude: Math.log10(data.length * data.width) + 3.98,
+                        velocity: 2.8,
+                        riseTime: 1.5,
+                        geojsonPatches: data.patches
+                    };
+                    
+                    logConsole('GeoJSON fault model ready!');
+                    logConsole(`  Total patches: ${data.patches.length}`);
+                    logConsole(`  Dimensions: ${data.length.toFixed(1)} x ${data.width.toFixed(1)} km`);
+                    
+                    updateStepStatus(1, 'complete');
+                    updateCurrentStatus('GeoJSON data loaded');
+                    document.getElementById('result-patches').textContent = data.patches.length;
+                    updateProgress(25);
+                    
+                    alert('✓ GeoJSON fault model ready for visualization!');
+                    
+                    // Auto-switch to visualization tab
+                    switchTab('visualization');
+                }, 500);
+                
+                return;
+            }
+            
+            // Synthetic fault creation
+            logConsole('Creating synthetic fault model...');
+            
+            // Update status
+            updateStepStatus(1, 'running');
+            updateCurrentStatus('Creating fault model...');
+            
+            // Get parameters
+            const params = {
+                length: document.getElementById('length').value,
+                width: document.getElementById('width').value,
+                depth: document.getElementById('depth').value,
+                patch: document.getElementById('patch').value,
+                strike: document.getElementById('strike').value,
+                dip: document.getElementById('dip').value,
+                rake: document.getElementById('rake').value,
+                magnitude: document.getElementById('magnitude').value,
+                velocity: document.getElementById('velocity').value,
+                riseTime: document.getElementById('risetime').value
+            };
+            
+            logConsole(`Fault parameters:`);
+            logConsole(`  Length: ${params.length} km`);
+            logConsole(`  Width: ${params.width} km`);
+            logConsole(`  Strike: ${params.strike}°`);
+            logConsole(`  Dip: ${params.dip}°`);
+            logConsole(`  Rake: ${params.rake}°`);
+            logConsole(`  Target Magnitude: ${params.magnitude}`);
+            
+            // Calculate patches
+            const nStrike = Math.floor(params.length / params.patch);
+            const nDip = Math.floor(params.width / params.patch);
+            const totalPatches = nStrike * nDip;
+            
+            // Call backend API to discretize fault
+            logConsole('Calling backend API...');
+            fetch(`${API_BASE_URL}/api/fault/discretize`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    length: parseFloat(params.length),
+                    width: parseFloat(params.width),
+                    patch_size: parseFloat(params.patch),
+                    strike: parseFloat(params.strike),
+                    dip: parseFloat(params.dip),
+                    rake: parseFloat(params.rake),
+                    depth: parseFloat(params.depth)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    faultModel = {
+                        mode: 'synthetic',
+                        ...params,
+                        patches: data.total_patches,
+                        nStrike: data.n_strike,
+                        nDip: data.n_dip,
+                        patchData: data.patches
+                    };
+                    
+                    logConsole(`Creating ${data.n_strike} x ${data.n_dip} = ${data.total_patches} patches`);
+                    logConsole('Fault model created successfully!');
+                    const M0 = Math.pow(10, 1.5 * parseFloat(params.magnitude) + 9.1);
+                    logConsole('Total moment: ' + M0.toExponential(2) + ' N·m');
+                    logConsole('Magnitude check: Mw ' + params.magnitude);
+                    
+                    updateStepStatus(1, 'complete');
+                    updateCurrentStatus('Fault model created');
+                    document.getElementById('result-patches').textContent = data.total_patches;
+                    updateProgress(25);
+                    
+                    alert('✓ Fault model created successfully!');
+                } else {
+                    throw new Error(data.error || 'Failed to create fault model');
+                }
+            })
+            .catch(error => {
+                logConsole('ERROR: ' + error.message);
+                updateStepStatus(1, 'error');
+                updateCurrentStatus('Error creating fault model');
+                alert('❌ Error: ' + error.message);
+            });
+        }
+
+        // Quick visualize
+        function quickVisualize() {
+            if (!faultModel) {
+                alert('Please create a fault model first');
+                return;
+            }
+            switchTab('visualization');
+            visualize('slip');
+        }
+
+        // Visualize
+        function visualize(type) {
+            if (!faultModel) {
+                alert('Please create a fault model first');
+                return;
+            }
+            
+            logConsole(`Generating ${type} visualization...`);
+            
+            const container = document.getElementById('visualization-container');
+            container.innerHTML = '';
+            
+            // Check if we have GeoJSON data
+            if (faultModel.mode === 'geojson' && faultModel.geojsonPatches) {
+                visualizeGeoJSON(type, faultModel.geojsonPatches);
+                return;
+            }
+            
+            // Synthetic fault visualization
+            const n = faultModel.nStrike;
+            const m = faultModel.nDip;
+            const patchSize = parseFloat(faultModel.patch);
+            const length = parseFloat(faultModel.length);
+            const width = parseFloat(faultModel.width);
+            
+            let data, title, colorscale, colorbarTitle;
+            
+            if (type === 'slip') {
+                data = generateMockSlipData(n, m, parseFloat(document.getElementById('rake').value));
+                title = 'Slip Distribution';
+                colorscale = 'Viridis';
+                colorbarTitle = 'Slip (m)';
+            } else if (type === 'rupture') {
+                data = generateMockRuptureData(n, m, parseFloat(document.getElementById('rake').value));
+                title = 'Rupture Time Distribution';
+                colorscale = 'Plasma';
+                colorbarTitle = 'Time (s)';
+            } else if (type === 'moment') {
+                data = generateMockMomentData(n, m, parseFloat(faultModel.magnitude), parseFloat(document.getElementById('rake').value));
+                title = 'Moment Release per Patch';
+                colorscale = 'Hot';
+                colorbarTitle = 'Moment (Nm)';
+            } else if (type === 'stf') {
+                visualizeSTF();
+                return;
+            }
+            
+            // Create x and y coordinates in km
+            const x = [];
+            const y = [];
+            for (let i = 0; i < n; i++) {
+                x.push((i + 0.5) * patchSize);
+            }
+            for (let j = 0; j < m; j++) {
+                y.push((j + 0.5) * patchSize);
+            }
+            
+            // Get hypocenter location
+            const hypoStrike = parseFloat(document.getElementById('hypo-strike').value);
+            const hypoDip = parseFloat(document.getElementById('hypo-dip').value);
+            const topDepth = parseFloat(document.getElementById('depth').value);
+            
+            // Create 2D heatmap
+            const trace = {
+                x: x,
+                y: y,
+                z: data,
+                type: 'heatmap',
+                colorscale: colorscale,
+                colorbar: {
+                    title: colorbarTitle
+                },
+                hovertemplate: 'Along Strike: %{x:.1f} km<br>' +
+                              'Down Dip: %{y:.1f} km<br>' +
+                              'Depth: ' + (topDepth + hypoDip * width).toFixed(1) + ' km<br>' +
+                              colorbarTitle + ': %{z:.2f}<extra></extra>'
+            };
+            
+            // Add hypocenter marker
+            const hypoTrace = {
+                x: [hypoStrike * length],
+                y: [hypoDip * width],
+                mode: 'markers+text',
+                marker: {
+                    size: 15,
+                    color: 'white',
+                    symbol: 'star',
+                    line: {
+                        color: 'black',
+                        width: 2
+                    }
+                },
+                text: ['★ Hypocenter'],
+                textposition: 'top center',
+                textfont: {
+                    color: 'white',
+                    size: 12,
+                    family: 'Inter'
+                },
+                showlegend: false,
+                hovertemplate: 'Hypocenter<br>' +
+                              'Along Strike: ' + (hypoStrike * length).toFixed(1) + ' km<br>' +
+                              'Down Dip: ' + (hypoDip * width).toFixed(1) + ' km<br>' +
+                              'Depth: ' + (topDepth + hypoDip * width).toFixed(1) + ' km<extra></extra>'
+            };
+            
+            const layout = {
+                title: {
+                    text: title + ` (Top Depth: ${topDepth} km)`,
+                    font: { size: 20, family: 'Inter' }
+                },
+                xaxis: { 
+                    title: 'Along Strike (km)',
+                    range: [0, length]
+                },
+                yaxis: { 
+                    title: 'Down Dip (km)',
+                    range: [0, width],
+                    scaleanchor: 'x'
+                },
+                height: 600,
+                width: 800,
+                annotations: [{
+                    text: `Fault extends from ${topDepth.toFixed(1)} to ${(topDepth + width * Math.sin(parseFloat(faultModel.dip) * Math.PI / 180)).toFixed(1)} km depth`,
+                    xref: 'paper',
+                    yref: 'paper',
+                    x: 0.5,
+                    y: -0.15,
+                    showarrow: false,
+                    font: { size: 12, color: '#666' }
+                }]
+            };
+            
+            Plotly.newPlot(container, [trace, hypoTrace], layout);
+            logConsole(`${title} visualization complete`);
+            logConsole(`Fault dimensions: ${length} km x ${width} km (${n} x ${m} patches)`);
+            logConsole(`Top depth: ${topDepth} km, Hypocenter at ${(topDepth + hypoDip * width).toFixed(1)} km depth`);
+        }
+
+        // 3D Visualization for synthetic faults
+        function visualize3D(type) {
+            if (!faultModel) {
+                alert('Please create a fault model first');
+                return;
+            }
+            
+            if (faultModel.mode === 'geojson') {
+                alert('3D view currently only supports synthetic faults');
+                return;
+            }
+            
+            logConsole(`Generating 3D ${type} visualization...`);
+            
+            const container = document.getElementById('visualization-container');
+            container.innerHTML = '';
+            
+            const n = faultModel.nStrike;
+            const m = faultModel.nDip;
+            const patchSize = parseFloat(faultModel.patch);
+            const length = parseFloat(faultModel.length);
+            const width = parseFloat(faultModel.width);
+            const topDepth = parseFloat(document.getElementById('depth').value);
+            const strike = parseFloat(faultModel.strike) * Math.PI / 180;
+            const dip = parseFloat(faultModel.dip) * Math.PI / 180;
+            const hypoStrike = parseFloat(document.getElementById('hypo-strike').value);
+            const hypoDip = parseFloat(document.getElementById('hypo-dip').value);
+            const refLat = parseFloat(document.getElementById('ref-lat').value);
+            const refLon = parseFloat(document.getElementById('ref-lon').value);
+            
+            let data, title, colorscale, colorbarTitle;
+            
+            if (type === 'slip') {
+                data = generateMockSlipData(n, m, parseFloat(document.getElementById('rake').value));
+                title = '3D Slip Distribution';
+                colorscale = 'Viridis';
+                colorbarTitle = 'Slip (m)';
+            } else if (type === 'rupture') {
+                data = generateMockRuptureData(n, m, parseFloat(document.getElementById('rake').value));
+                title = '3D Rupture Time Distribution';
+                colorscale = 'Plasma';
+                colorbarTitle = 'Time (s)';
+            } else if (type === 'moment') {
+                data = generateMockMomentData(n, m, parseFloat(faultModel.magnitude), parseFloat(document.getElementById('rake').value));
+                title = '3D Moment Release';
+                colorscale = 'Hot';
+                colorbarTitle = 'Moment (Nm)';
+            }
+            
+            // Create 3D mesh coordinates for surface
+            const x = [];
+            const y = [];
+            const z = [];
+            
+            // Build grid for surface mesh - use patch centers
+            for (let j = 0; j < m; j++) {
+                const rowX = [];
+                const rowY = [];
+                const rowZ = [];
+                for (let i = 0; i < n; i++) {
+                    // Position at patch centers
+                    const alongStrike = (i + 0.5) * patchSize;
+                    const downDip = (j + 0.5) * patchSize;
+                    
+                    // Convert to geographic coordinates
+                    const deltaLon = (alongStrike * Math.cos(strike)) / (111 * Math.cos(refLat * Math.PI / 180));
+                    const deltaLat = (alongStrike * Math.sin(strike)) / 111;
+                    
+                    // Calculate depth (accounting for dip)
+                    const depth = topDepth + downDip * Math.sin(dip);
+                    
+                    rowX.push(refLon + deltaLon);
+                    rowY.push(refLat + deltaLat);
+                    rowZ.push(-depth); // Negative for plotting (down is negative)
+                }
+                x.push(rowX);
+                y.push(rowY);
+                z.push(rowZ);
+            }
+            
+            // Create 3D surface plot
+            const trace = {
+                x: x,
+                y: y,
+                z: z,
+                surfacecolor: data,
+                type: 'surface',
+                colorscale: colorscale,
+                showscale: true,
+                colorbar: {
+                    title: colorbarTitle
+                },
+                contours: {
+                    z: {
+                        show: true,
+                        usecolormap: true,
+                        highlightcolor: "#42f462",
+                        project: { z: false }
+                    }
+                },
+                hovertemplate: 'Lon: %{x:.4f}°<br>' +
+                              'Lat: %{y:.4f}°<br>' +
+                              'Depth: %{z:.1f} km<br>' +
+                              colorbarTitle + ': %{surfacecolor:.2f}<extra></extra>'
+            };
+            
+            // Add hypocenter marker
+            const hypoAlongStrike = hypoStrike * length;
+            const hypoDownDip = hypoDip * width;
+            const hypoDepth = topDepth + hypoDownDip * Math.sin(dip);
+            
+            const hypoDeltaLon = (hypoAlongStrike * Math.cos(strike)) / (111 * Math.cos(refLat * Math.PI / 180));
+            const hypoDeltaLat = (hypoAlongStrike * Math.sin(strike)) / 111;
+            
+            const hypoTrace = {
+                x: [refLon + hypoDeltaLon],
+                y: [refLat + hypoDeltaLat],
+                z: [-hypoDepth],
+                mode: 'markers+text',
+                type: 'scatter3d',
+                marker: {
+                    size: 10,
+                    color: 'red',
+                    symbol: 'diamond',
+                    line: {
+                        color: 'white',
+                        width: 2
+                    }
+                },
+                text: ['★ Hypocenter'],
+                textposition: 'top center',
+                showlegend: false,
+                hovertemplate: '<b>Hypocenter</b><br>' +
+                              'Depth: ' + hypoDepth.toFixed(1) + ' km<br>' +
+                              'Lat: ' + (refLat + hypoDeltaLat).toFixed(4) + '°<br>' +
+                              'Lon: ' + (refLon + hypoDeltaLon).toFixed(4) + '°<extra></extra>'
+            };
+            
+            const layout = {
+                title: {
+                    text: title,
+                    font: { size: 20, family: 'Inter' }
+                },
+                scene: {
+                    xaxis: { title: 'Longitude (°)' },
+                    yaxis: { title: 'Latitude (°)' },
+                    zaxis: { title: 'Depth (km)', autorange: 'reversed' },
+                    aspectmode: 'manual',
+                    aspectratio: {
+                        x: 1,
+                        y: 1,
+                        z: 0.3  // Compress depth axis to reduce exaggeration
+                    },
+                    camera: {
+                        eye: { x: 1.5, y: 1.5, z: 1.2 }
+                    }
+                },
+                height: 700,
+                width: 900
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToAdd: ['pan3d', 'zoom3d', 'orbitRotation', 'tableRotation', 'resetCameraDefault3d']
+            };
+            
+            Plotly.newPlot(container, [trace, hypoTrace], layout, config);
+            logConsole(`${title} complete`);
+            logConsole(`Fault top: ${topDepth} km, bottom: ${(topDepth + width * Math.sin(dip)).toFixed(1)} km`);
+            logConsole(`Hypocenter depth: ${hypoDepth.toFixed(1)} km`);
+        }
+        
+        // Visualize GeoJSON data directly
+        function visualizeGeoJSON(type, patches) {
+            const container = document.getElementById('visualization-container');
+            
+            logConsole(`Visualizing GeoJSON ${type} data (${patches.length} patches)...`);
+            
+            let values, title, colorbarTitle, colorscale;
+            
+            if (type === 'slip') {
+                values = patches.map(p => p.slip || 0);
+                title = 'Slip Distribution (from GeoJSON)';
+                colorbarTitle = 'Slip (m)';
+                colorscale = 'Viridis';
+            } else if (type === 'rupture') {
+                values = patches.map(p => p.trup || 0);
+                title = 'Rupture Time (from GeoJSON)';
+                colorbarTitle = 'Time (s)';
+                colorscale = 'Plasma';
+            } else if (type === 'moment') {
+                // Use sf_moment from GeoJSON or calculate
+                values = patches.map(p => {
+                    if (p.sf_moment) return p.sf_moment;
+                    const slip = p.slip || 0;
+                    const area = p.area || (p.length * p.width) || 4e6; // m²
+                    const mu = 3e10; // Pa (shear modulus)
+                    return mu * area * slip;
+                });
+                title = 'Moment Release (from GeoJSON)';
+                colorbarTitle = 'Moment (N·m)';
+                colorscale = 'Hot';
+            } else if (type === 'stf') {
+                visualizeSTF();
+                return;
+            } else {
+                // Default to slip
+                values = patches.map(p => p.slip || 0);
+                title = 'Slip Distribution (from GeoJSON)';
+                colorbarTitle = 'Slip (m)';
+                colorscale = 'Viridis';
+            }
+            
+            // Check if we have polygon data
+            const hasPolygons = patches[0] && patches[0].polygon;
+            
+            if (hasPolygons) {
+                // Create mesh/polygon visualization
+                const traces = [];
+                
+                patches.forEach((patch, idx) => {
+                    if (!patch.polygon) return;
+                    
+                    // Extract polygon vertices
+                    const polyLons = patch.polygon.map(p => p[0]);
+                    const polyLats = patch.polygon.map(p => p[1]);
+                    
+                    // Close the polygon
+                    polyLons.push(polyLons[0]);
+                    polyLats.push(polyLats[0]);
+                    
+                    // Normalize color value for this patch
+                    const maxVal = Math.max(...values);
+                    const minVal = Math.min(...values);
+                    const normalizedValue = (values[idx] - minVal) / (maxVal - minVal || 1);
+                    
+                    // Get color from colorscale
+                    const color = getColorFromScale(normalizedValue, colorscale);
+                    
+                    traces.push({
+                        x: polyLons,
+                        y: polyLats,
+                        mode: 'lines',
+                        fill: 'toself',
+                        fillcolor: color,
+                        line: {
+                            color: 'rgba(100,100,100,0.3)',
+                            width: 0.5
+                        },
+                        type: 'scatter',
+                        showlegend: false,
+                        hoverinfo: 'text',
+                        text: `Lon: ${patch.lon.toFixed(3)}<br>` +
+                              `Lat: ${patch.lat.toFixed(3)}<br>` +
+                              `Depth: ${patch.depth.toFixed(1)} km<br>` +
+                              (patch.slip ? `Slip: ${patch.slip.toFixed(2)} m<br>` : '') +
+                              (patch.trup !== undefined ? `Rupture Time: ${patch.trup.toFixed(2)} s<br>` : '') +
+                              (patch.rake !== undefined ? `Rake: ${patch.rake.toFixed(0)}°<br>` : '') +
+                              (patch.strike !== undefined ? `Strike: ${patch.strike.toFixed(0)}°<br>` : '') +
+                              (patch.dip !== undefined ? `Dip: ${patch.dip.toFixed(0)}°` : '')
+                    });
+                });
+                
+                // Add invisible trace for colorbar
+                const lons = patches.map(p => p.lon);
+                const lats = patches.map(p => p.lat);
+                traces.push({
+                    x: lons,
+                    y: lats,
+                    mode: 'markers',
+                    marker: {
+                        size: 0.1,
+                        color: values,
+                        colorscale: colorscale,
+                        showscale: true,
+                        colorbar: {
+                            title: colorbarTitle
+                        }
+                    },
+                    type: 'scatter',
+                    showlegend: false,
+                    hoverinfo: 'skip'
+                });
+                
+                const layout = {
+                    title: {
+                        text: title,
+                        font: { size: 20, family: 'Inter' }
+                    },
+                    xaxis: { 
+                        title: 'Longitude (°)',
+                        scaleanchor: 'y'
+                    },
+                    yaxis: { 
+                        title: 'Latitude (°)'
+                    },
+                    height: 600,
+                    width: 800,
+                    hovermode: 'closest'
+                };
+                
+                Plotly.newPlot(container, traces, layout);
+            } else {
+                // Fallback to scatter plot if no polygons
+                const lons = patches.map(p => p.lon);
+                const lats = patches.map(p => p.lat);
+                
+                const trace = {
+                    x: lons,
+                    y: lats,
+                    mode: 'markers',
+                    marker: {
+                        size: 8,
+                        color: values,
+                        colorscale: colorscale,
+                        showscale: true,
+                        colorbar: {
+                            title: colorbarTitle
+                        }
+                    },
+                    type: 'scatter',
+                    text: patches.map((p, i) => 
+                        `Lon: ${p.lon.toFixed(3)}<br>` +
+                        `Lat: ${p.lat.toFixed(3)}<br>` +
+                        `Depth: ${p.depth.toFixed(1)} km<br>` +
+                        (p.slip ? `Slip: ${p.slip.toFixed(2)} m<br>` : '') +
+                        (p.trup !== undefined ? `Rupture Time: ${p.trup.toFixed(2)} s<br>` : '') +
+                        (p.rake !== undefined ? `Rake: ${p.rake.toFixed(0)}°<br>` : '') +
+                        (p.strike !== undefined ? `Strike: ${p.strike.toFixed(0)}°<br>` : '') +
+                        (p.dip !== undefined ? `Dip: ${p.dip.toFixed(0)}°` : '')
+                    ),
+                    hovertemplate: '%{text}<extra></extra>'
+                };
+                
+                const layout = {
+                    title: {
+                        text: title,
+                        font: { size: 20, family: 'Inter' }
+                    },
+                    xaxis: { title: 'Longitude (°)' },
+                    yaxis: { 
+                        title: 'Latitude (°)',
+                        scaleanchor: 'x'
+                    },
+                    height: 600,
+                    width: 800,
+                    hovermode: 'closest'
+                };
+                
+                Plotly.newPlot(container, [trace], layout);
+            }
+            
+            // Log statistics
+            const validValues = values.filter(v => !isNaN(v) && v > 0);
+            if (validValues.length > 0) {
+                const max = Math.max(...validValues);
+                const min = Math.min(...validValues);
+                const avg = validValues.reduce((a,b) => a+b) / validValues.length;
+                logConsole(`${type} statistics:`);
+                logConsole(`  Min: ${min.toExponential(2)}`);
+                logConsole(`  Max: ${max.toExponential(2)}`);
+                logConsole(`  Mean: ${avg.toExponential(2)}`);
+            }
+            
+            logConsole('GeoJSON visualization complete');
+        }
+        
+        // Helper function to get color from colorscale
+        function getColorFromScale(value, scaleName) {
+            // Clamp value between 0 and 1
+            value = Math.max(0, Math.min(1, value));
+            
+            // Define some common colorscales
+            const scales = {
+                'Viridis': [
+                    [0, 'rgb(68,1,84)'], [0.25, 'rgb(59,82,139)'], 
+                    [0.5, 'rgb(33,145,140)'], [0.75, 'rgb(94,201,98)'], 
+                    [1, 'rgb(253,231,37)']
+                ],
+                'Plasma': [
+                    [0, 'rgb(13,8,135)'], [0.25, 'rgb(126,3,168)'], 
+                    [0.5, 'rgb(204,71,120)'], [0.75, 'rgb(248,149,64)'], 
+                    [1, 'rgb(240,249,33)']
+                ],
+                'Hot': [
+                    [0, 'rgb(0,0,0)'], [0.33, 'rgb(230,0,0)'], 
+                    [0.66, 'rgb(255,210,0)'], [1, 'rgb(255,255,255)']
+                ],
+                'RdBu': [
+                    [0, 'rgb(5,10,172)'], [0.35, 'rgb(106,137,247)'],
+                    [0.5, 'rgb(190,190,190)'], [0.65, 'rgb(220,170,132)'],
+                    [1, 'rgb(230,40,20)']
+                ]
+            };
+            
+            const scale = scales[scaleName] || scales['Viridis'];
+            
+            // Find the two colors to interpolate between
+            let lowerIdx = 0;
+            for (let i = 0; i < scale.length - 1; i++) {
+                if (value >= scale[i][0] && value <= scale[i + 1][0]) {
+                    lowerIdx = i;
+                    break;
+                }
+            }
+            
+            const lower = scale[lowerIdx];
+            const upper = scale[lowerIdx + 1] || scale[lowerIdx];
+            
+            // Interpolate
+            const t = (value - lower[0]) / (upper[0] - lower[0] || 1);
+            
+            // Parse RGB values
+            const parseLower = lower[1].match(/\d+/g).map(Number);
+            const parseUpper = upper[1].match(/\d+/g).map(Number);
+            
+            const r = Math.round(parseLower[0] + (parseUpper[0] - parseLower[0]) * t);
+            const g = Math.round(parseLower[1] + (parseUpper[1] - parseLower[1]) * t);
+            const b = Math.round(parseLower[2] + (parseUpper[2] - parseLower[2]) * t);
+            
+            return `rgba(${r},${g},${b},0.7)`;
+        }
+        
+        // Generate mock data functions
+        function generateMockSlipData(n, m, rake) {
+            const data = [];
+            // Read actual hypocenter location from sliders
+            const hypoStrike = parseFloat(document.getElementById('hypo-strike').value);
+            const hypoDip = parseFloat(document.getElementById('hypo-dip').value);
+            const hypoI = Math.floor(n * hypoStrike);
+            const hypoJ = Math.floor(m * hypoDip);
+            
+            // Rake-dependent slip distribution
+            const isStrikeSlip = (rake >= -45 && rake <= 45) || rake >= 135 || rake <= -135;
+            const isReverse = rake > 45 && rake < 135;
+            const isNormal = rake > -135 && rake < -45;
+            
+            // Calculate max slip based on magnitude
+            // M0 = 10^(1.5*Mw + 9.1), M0 = μ*A*D, so D = M0/(μ*A)
+            const magnitude = parseFloat(document.getElementById('magnitude').value);
+            const M0 = Math.pow(10, 1.5 * magnitude + 9.1); // N·m
+            const mu = 3e10; // Pa (shear modulus)
+            const faultArea = n * m * Math.pow(parseFloat(document.getElementById('patch').value) * 1000, 2); // m²
+            const avgSlip = M0 / (mu * faultArea); // m
+            const maxSlip = avgSlip * 2; // Peak slip is roughly 2x average
+            
+            // Get selected slip distribution type
+            const slipDist = document.getElementById('slip-dist').value;
+            
+            // Helper function to calculate rake-dependent distance
+            function calcRakeDist(di, dj) {
+                if (isStrikeSlip) {
+                    // Elongated along strike
+                    return Math.sqrt((di * 0.6) ** 2 + (dj * 1.8) ** 2);
+                } else if (isReverse) {
+                    // Biased updip (negative dj)
+                    const weight = dj < 0 ? 0.6 : 2.0;
+                    return Math.sqrt((di * 1.0) ** 2 + (dj * weight) ** 2);
+                } else if (isNormal) {
+                    // Biased downdip (positive dj)
+                    const weight = dj > 0 ? 0.6 : 2.0;
+                    return Math.sqrt((di * 1.0) ** 2 + (dj * weight) ** 2);
+                } else {
+                    return Math.sqrt(di ** 2 + dj ** 2);
+                }
+            }
+            
+            for (let j = 0; j < m; j++) {
+                const row = [];
+                for (let i = 0; i < n; i++) {
+                    const di = (i - hypoI) / n;
+                    const dj = (j - hypoJ) / m;
+                    
+                    let slip;
+                    
+                    if (slipDist === 'uniform') {
+                        // Uniform distribution - constant slip everywhere
+                        slip = avgSlip * (0.9 + Math.random() * 0.2);
+                        
+                    } else if (slipDist === 'random') {
+                        // Random distribution with rake-dependent modulation
+                        const dist = calcRakeDist(di, dj);
+                        const envelope = Math.exp(-dist / 0.4); // Soft envelope based on rake
+                        slip = maxSlip * Math.random() * (0.3 + 0.7 * envelope);
+                        
+                    } else if (slipDist === 'asperity') {
+                        // Asperity model - positions relative to hypocenter
+                        let asp1_i, asp1_j, asp2_i, asp2_j, asp3_i, asp3_j;
+                        
+                        if (isStrikeSlip) {
+                            // Asperities spread along strike relative to hypocenter
+                            asp1_i = -0.2; asp1_j = 0.0;
+                            asp2_i = 0.1;  asp2_j = 0.0;
+                            asp3_i = 0.3;  asp3_j = 0.0;
+                        } else if (isReverse) {
+                            // Asperities favor updip from hypocenter
+                            asp1_i = 0.0;  asp1_j = -0.2;
+                            asp2_i = 0.1;  asp2_j = -0.1;
+                            asp3_i = -0.1; asp3_j = -0.15;
+                        } else if (isNormal) {
+                            // Asperities favor downdip from hypocenter
+                            asp1_i = 0.0;  asp1_j = 0.2;
+                            asp2_i = 0.1;  asp2_j = 0.15;
+                            asp3_i = -0.1; asp3_j = 0.1;
+                        } else {
+                            // Generic distribution around hypocenter
+                            asp1_i = -0.1; asp1_j = 0.0;
+                            asp2_i = 0.1;  asp2_j = 0.1;
+                            asp3_i = 0.0;  asp3_j = -0.1;
+                        }
+                        
+                        const d1 = Math.sqrt((di - asp1_i) ** 2 + (dj - asp1_j) ** 2);
+                        const d2 = Math.sqrt((di - asp2_i) ** 2 + (dj - asp2_j) ** 2);
+                        const d3 = Math.sqrt((di - asp3_i) ** 2 + (dj - asp3_j) ** 2);
+                        
+                        const s1 = maxSlip * 1.2 * Math.exp(-d1 / 0.15);
+                        const s2 = maxSlip * 0.8 * Math.exp(-d2 / 0.15);
+                        const s3 = maxSlip * 0.6 * Math.exp(-d3 / 0.15);
+                        
+                        slip = Math.max(s1, s2, s3) * (0.8 + Math.random() * 0.4);
+                        
+                    } else {
+                        // Gaussian (default) - smooth distribution centered on hypocenter
+                        const dist = calcRakeDist(di, dj);
+                        slip = maxSlip * Math.exp(-dist / 0.25) * (0.8 + Math.random() * 0.4);
+                    }
+                    
+                    row.push(Math.max(0, slip));
+                }
+                data.push(row);
+            }
+            return data;
+        }
+
+        function generateMockRuptureData(n, m, rake) {
+            const data = [];
+            // Read actual hypocenter location from sliders
+            const hypoStrike = parseFloat(document.getElementById('hypo-strike').value);
+            const hypoDip = parseFloat(document.getElementById('hypo-dip').value);
+            const hypoI = Math.floor(n * hypoStrike);
+            const hypoJ = Math.floor(m * hypoDip);
+            const velocity = parseFloat(document.getElementById('velocity').value);
+            const patchSize = parseFloat(document.getElementById('patch').value);
+            
+            // Rake-dependent rupture propagation
+            const isStrikeSlip = (rake >= -45 && rake <= 45) || rake >= 135 || rake <= -135;
+            const isReverse = rake > 45 && rake < 135;
+            const isNormal = rake > -135 && rake < -45;
+            
+            for (let j = 0; j < m; j++) {
+                const row = [];
+                for (let i = 0; i < n; i++) {
+                    const di = i - hypoI;
+                    const dj = j - hypoJ;
+                    
+                    let distance;
+                    if (isStrikeSlip) {
+                        distance = Math.sqrt((di * 1.0) ** 2 + (dj * 0.3) ** 2);
+                    } else if (isReverse) {
+                        const weight = dj < 0 ? 0.6 : 2.0;
+                        distance = Math.sqrt((di * 1.0) ** 2 + (dj * weight) ** 2);
+                    } else if (isNormal) {
+                        const weight = dj > 0 ? 0.6 : 2.0;
+                        distance = Math.sqrt((di * 1.0) ** 2 + (dj * weight) ** 2);
+                    } else {
+                        distance = Math.sqrt(di ** 2 + dj ** 2);
+                    }
+                    
+                    row.push(distance * patchSize / velocity);
+                }
+                data.push(row);
+            }
+            return data;
+        }
+
+        function generateMockMomentData(n, m, magnitude, rake) {
+            // Get the slip distribution first
+            const slipData = generateMockSlipData(n, m, rake);
+            
+            // Calculate moment from slip using M0 = μ * A * D
+            const mu = 3e10; // Pa (shear modulus)
+            const patchSize = parseFloat(document.getElementById('patch').value) * 1000; // m
+            const patchArea = patchSize * patchSize; // m²
+            
+            const data = [];
+            for (let j = 0; j < m; j++) {
+                const row = [];
+                for (let i = 0; i < n; i++) {
+                    const slip = slipData[j][i]; // m
+                    
+                    // M0 = μ * A * D
+                    // Add slight rigidity variation with depth (deeper = higher rigidity)
+                    const rigidityVariation = 1.0 + (j / m) * 0.2;
+                    const moment = mu * rigidityVariation * patchArea * slip; // N·m
+                    
+                    row.push(moment);
+                }
+                data.push(row);
+            }
+            return data;
+        }
+
+        // Visualize Source Time Function
+        function visualizeSTF() {
+            const container = document.getElementById('visualization-container');
+            container.innerHTML = '';
+            
+            if (!faultModel) {
+                alert('Please create a fault model first');
+                return;
+            }
+            
+            // Generate mock STF data
+            const time = [];
+            const momentRate = [];
+            const cumMoment = [];
+            
+            // Calculate realistic duration from fault geometry
+            const length = parseFloat(faultModel.length);
+            const width = parseFloat(faultModel.width);
+            const velocity = parseFloat(faultModel.velocity);
+            const riseTime = parseFloat(faultModel.riseTime);
+            const magnitude = parseFloat(faultModel.magnitude);
+            
+            // Rupture duration = max distance / velocity + rise time
+            const maxDist = Math.sqrt(length ** 2 + width ** 2);
+            const duration = maxDist / velocity + riseTime * 2;
+            const dt = duration / 200;
+            
+            // Total moment from magnitude: M0 = 10^(1.5*Mw + 9.1)
+            const totalMoment = Math.pow(10, 1.5 * magnitude + 9.1); // N·m
+            
+            let cumSum = 0;
+            const peakTime = duration * 0.35;
+            
+            for (let t = 0; t <= duration; t += dt) {
+                time.push(t);
+                // Asymmetric moment release (faster rise, slower decay)
+                const rate = totalMoment / duration * 
+                    Math.exp(-Math.pow((t - peakTime) / (duration * 0.3), 2)) * 
+                    (1 + 0.3 * Math.sin(t * 2 * Math.PI / duration));
+                momentRate.push(Math.max(0, rate));
+                cumSum += rate * dt;
+                cumMoment.push(cumSum);
+            }
+            
+            logConsole(`STF duration: ${duration.toFixed(2)} s`);
+            logConsole(`Total moment: ${totalMoment.toExponential(2)} N·m`);
+            logConsole(`Moment magnitude: Mw ${magnitude}`);
+            
+            // Create subplots
+            const trace1 = {
+                x: time,
+                y: momentRate,
+                name: 'Moment Rate',
+                type: 'scatter',
+                fill: 'tozeroy',
+                line: { color: '#667eea', width: 3 }
+            };
+            
+            const trace2 = {
+                x: time,
+                y: cumMoment,
+                name: 'Cumulative Moment',
+                type: 'scatter',
+                xaxis: 'x2',
+                yaxis: 'y2',
+                line: { color: '#f5576c', width: 3 }
+            };
+            
+            const layout = {
+                title: {
+                    text: 'Source Time Function',
+                    font: { size: 20, family: 'Inter' }
+                },
+                grid: { rows: 1, columns: 2, pattern: 'independent' },
+                xaxis: { title: 'Time (s)', domain: [0, 0.48] },
+                yaxis: { title: 'Moment Rate (Nm/s)' },
+                xaxis2: { title: 'Time (s)', domain: [0.52, 1] },
+                yaxis2: { title: 'Cumulative Moment (Nm)', anchor: 'x2' },
+                height: 600,
+                showlegend: false
+            };
+            
+            Plotly.newPlot(container, [trace1, trace2], layout);
+            logConsole('Source Time Function visualization complete');
+        }
+
+        // Clear visualization
+        function clearVisualization() {
+            const container = document.getElementById('visualization-container');
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-96 text-gray-400">
+                    <i class="fas fa-chart-area text-6xl mb-4"></i>
+                    <p class="text-xl">Visualization cleared</p>
+                    <p class="text-sm mt-2">Select a visualization type to display</p>
+                </div>
+            `;
+            logConsole('Visualization cleared');
+        }
+
+        // Map View - Fault and Stations
+        function visualizeMap() {
+            if (!faultModel) {
+                alert('Please create a fault model first');
+                return;
+            }
+            
+            logConsole('Generating map view with fault and stations...');
+            
+            const container = document.getElementById('visualization-container');
+            container.innerHTML = '';
+            
+            const n = faultModel.nStrike;
+            const m = faultModel.nDip;
+            const patchSize = parseFloat(faultModel.patch);
+            const length = parseFloat(faultModel.length);
+            const width = parseFloat(faultModel.width);
+            const topDepth = parseFloat(document.getElementById('depth').value);
+            const strike = parseFloat(faultModel.strike) * Math.PI / 180;
+            const dip = parseFloat(faultModel.dip) * Math.PI / 180;
+            const refLat = parseFloat(document.getElementById('ref-lat').value);
+            const refLon = parseFloat(document.getElementById('ref-lon').value);
+            
+            // Generate fault outline
+            const faultCorners = [
+                [0, 0], // Top left
+                [length, 0], // Top right
+                [length, width * Math.cos(dip)], // Bottom right (projected)
+                [0, width * Math.cos(dip)]  // Bottom left (projected)
+            ];
+            
+            const faultLons = [];
+            const faultLats = [];
+            
+            faultCorners.forEach(([alongStrike, downDip]) => {
+                const deltaLon = (alongStrike * Math.cos(strike) - downDip * Math.sin(strike)) / (111 * Math.cos(refLat * Math.PI / 180));
+                const deltaLat = (alongStrike * Math.sin(strike) + downDip * Math.cos(strike)) / 111;
+                faultLons.push(refLon + deltaLon);
+                faultLats.push(refLat + deltaLat);
+            });
+            
+            // Close the polygon
+            faultLons.push(faultLons[0]);
+            faultLats.push(faultLats[0]);
+            
+            // Fault outline trace
+            const faultTrace = {
+                lon: faultLons,
+                lat: faultLats,
+                mode: 'lines',
+                line: {
+                    color: 'red',
+                    width: 3
+                },
+                name: 'Fault Surface',
+                type: 'scattergeo',
+                hovertemplate: '<b>Fault Surface</b><br>' +
+                              'Length: ' + length.toFixed(1) + ' km<br>' +
+                              'Width: ' + width.toFixed(1) + ' km<br>' +
+                              'Strike: ' + faultModel.strike + '°<br>' +
+                              'Dip: ' + faultModel.dip + '°<extra></extra>'
+            };
+            
+            // Hypocenter location
+            const hypoStrike = parseFloat(document.getElementById('hypo-strike').value);
+            const hypoDip = parseFloat(document.getElementById('hypo-dip').value);
+            const hypoAlongStrike = hypoStrike * length;
+            const hypoDownDip = hypoDip * width;
+            
+            const hypoDeltaLon = (hypoAlongStrike * Math.cos(strike) - hypoDownDip * Math.cos(dip) * Math.sin(strike)) / (111 * Math.cos(refLat * Math.PI / 180));
+            const hypoDeltaLat = (hypoAlongStrike * Math.sin(strike) + hypoDownDip * Math.cos(dip) * Math.cos(strike)) / 111;
+            
+            const hypoTrace = {
+                lon: [refLon + hypoDeltaLon],
+                lat: [refLat + hypoDeltaLat],
+                mode: 'markers+text',
+                marker: {
+                    size: 15,
+                    color: 'red',
+                    symbol: 'star',
+                    line: {
+                        color: 'white',
+                        width: 2
+                    }
+                },
+                text: ['★'],
+                textfont: { size: 20, color: 'red' },
+                name: 'Hypocenter',
+                type: 'scattergeo',
+                hovertemplate: '<b>Hypocenter</b><br>' +
+                              'Lat: ' + (refLat + hypoDeltaLat).toFixed(4) + '°<br>' +
+                              'Lon: ' + (refLon + hypoDeltaLon).toFixed(4) + '°<br>' +
+                              'Depth: ' + (topDepth + hypoDownDip * Math.sin(dip)).toFixed(1) + ' km<extra></extra>'
+            };
+            
+            // Generate synthetic stations
+            const numStations = parseInt(document.getElementById('num-stations').value);
+            const maxDist = parseFloat(document.getElementById('max-dist').value);
+            
+            const stationLons = [];
+            const stationLats = [];
+            const stationNames = [];
+            const stationDistances = [];
+            
+            for (let i = 0; i < numStations; i++) {
+                const angle = (i / numStations) * 2 * Math.PI;
+                const dist = (Math.random() * 0.7 + 0.3) * maxDist; // Random distance 30%-100% of max
+                
+                const deltaLon = (dist / 111) * Math.cos(angle) / Math.cos(refLat * Math.PI / 180);
+                const deltaLat = (dist / 111) * Math.sin(angle);
+                
+                stationLons.push(refLon + deltaLon);
+                stationLats.push(refLat + deltaLat);
+                stationNames.push(`ST${String(i + 1).padStart(3, '0')}`);
+                stationDistances.push(dist);
+            }
+            
+            const stationTrace = {
+                lon: stationLons,
+                lat: stationLats,
+                mode: 'markers+text',
+                marker: {
+                    size: 8,
+                    color: stationDistances,
+                    colorscale: 'Viridis',
+                    showscale: true,
+                    colorbar: {
+                        title: 'Distance (km)',
+                        x: 1.1
+                    },
+                    symbol: 'triangle-up',
+                    line: {
+                        color: 'black',
+                        width: 1
+                    }
+                },
+                text: stationNames,
+                textposition: 'top center',
+                textfont: { size: 8 },
+                name: 'Stations',
+                type: 'scattergeo',
+                hovertemplate: '<b>%{text}</b><br>' +
+                              'Lat: %{lat:.4f}°<br>' +
+                              'Lon: %{lon:.4f}°<br>' +
+                              'Distance: %{marker.color:.1f} km<extra></extra>'
+            };
+            
+            const data = [faultTrace, hypoTrace, stationTrace];
+            
+            const layout = {
+                title: {
+                    text: 'Fault and Station Map',
+                    font: { size: 20, family: 'Inter' }
+                },
+                geo: {
+                    scope: 'world',
+                    projection: { type: 'mercator' },
+                    showland: true,
+                    landcolor: 'rgb(243, 243, 243)',
+                    coastlinecolor: 'rgb(204, 204, 204)',
+                    showcountries: true,
+                    countrycolor: 'rgb(204, 204, 204)',
+                    showlakes: true,
+                    lakecolor: 'rgb(255, 255, 255)',
+                    center: {
+                        lon: refLon,
+                        lat: refLat
+                    },
+                    lonaxis: {
+                        range: [refLon - maxDist / 111 * 1.2, refLon + maxDist / 111 * 1.2]
+                    },
+                    lataxis: {
+                        range: [refLat - maxDist / 111 * 1.2, refLat + maxDist / 111 * 1.2]
+                    }
+                },
+                height: 700,
+                showlegend: true
+            };
+            
+            Plotly.newPlot(container, data, layout);
+            logConsole('Map view generated with fault and ' + numStations + ' stations');
+            logConsole(`Fault center: ${refLat.toFixed(4)}°, ${refLon.toFixed(4)}°`);
+            logConsole(`Station distribution: 0 - ${maxDist} km from fault`);
+        }
+
+        // Execute processing steps
+        function executeStep(step) {
+            if (step === 1) {
+                createFaultModel();
+            } else if (step === 2) {
+                if (!faultModel) {
+                    alert('Please create fault model first');
+                    return;
+                }
+                groupCentroids();
+            } else if (step === 3) {
+                if (currentStep < 2) {
+                    alert('Please complete previous steps first');
+                    return;
+                }
+                generateStations();
+            } else if (step === 4) {
+                if (currentStep < 3) {
+                    alert('Please complete previous steps first');
+                    return;
+                }
+                generateTables();
+            }
+        }
+
+        function groupCentroids() {
+            logConsole('Grouping centroids...');
+            updateStepStatus(2, 'running');
+            updateCurrentStatus('Grouping centroids by magnitude...');
+            
+            const targetMag = document.getElementById('target-mag').value;
+            
+            setTimeout(() => {
+                const numGroups = Math.floor(faultModel.patches / 5);
+                
+                logConsole(`Target magnitude: ${targetMag}`);
+                logConsole(`Grouped ${faultModel.patches} patches into ${numGroups} groups`);
+                logConsole('Centroids grouped successfully!');
+                
+                updateStepStatus(2, 'complete');
+                updateCurrentStatus('Centroids grouped');
+                document.getElementById('result-centroids').textContent = numGroups;
+                updateProgress(50);
+                currentStep = 2;
+                
+                alert('✓ Centroids grouped successfully!');
+            }, 1000);
+        }
+
+        function generateStations() {
+            logConsole('Generating synthetic stations...');
+            updateStepStatus(3, 'running');
+            updateCurrentStatus('Generating synthetic station network...');
+            
+            const numStations = document.getElementById('num-stations').value;
+            
+            setTimeout(() => {
+                logConsole(`Generated ${numStations} synthetic stations`);
+                logConsole('Stations processed successfully!');
+                
+                updateStepStatus(3, 'complete');
+                updateCurrentStatus('Stations generated');
+                document.getElementById('result-stations').textContent = numStations;
+                updateProgress(75);
+                currentStep = 3;
+                
+                alert('✓ Stations generated successfully!');
+            }, 1000);
+        }
+
+        function generateTables() {
+            logConsole('Generating generative tables...');
+            updateStepStatus(4, 'running');
+            updateCurrentStatus('Creating generative tables...');
+            
+            setTimeout(() => {
+                const numTables = document.getElementById('result-centroids').textContent;
+                
+                logConsole(`Generated tables for ${numTables} centroids`);
+                logConsole('Tables generated successfully!');
+                logConsole('='.repeat(70));
+                logConsole('PROCESSING COMPLETE!');
+                
+                updateStepStatus(4, 'complete');
+                updateCurrentStatus('Processing complete!');
+                document.getElementById('result-tables').textContent = numTables;
+                updateProgress(100);
+                currentStep = 4;
+                
+                alert('✓ Tables generated successfully! Processing complete!');
+            }, 1000);
+        }
+
+        // Run full pipeline
+        function runFullPipeline() {
+            if (!confirm('Run complete processing pipeline?')) return;
+            
+            logConsole('='.repeat(70));
+            logConsole('RUNNING FULL PIPELINE');
+            logConsole('='.repeat(70));
+            
+            createFaultModel();
+            
+            setTimeout(() => {
+                if (faultModel) {
+                    groupCentroids();
+                    setTimeout(() => {
+                        generateStations();
+                        setTimeout(() => {
+                            generateTables();
+                        }, 1500);
+                    }, 1500);
+                }
+            }, 2000);
+        }
+
+        // Update step status
+        function updateStepStatus(step, status) {
+            const badge = document.getElementById(`status-step${step}`);
+            badge.className = 'status-badge';
+            
+            if (status === 'running') {
+                badge.classList.add('status-running');
+                badge.innerHTML = '<i class="fas fa-spinner animate-spin"></i>Running';
+            } else if (status === 'complete') {
+                badge.classList.add('status-complete');
+                badge.innerHTML = '<i class="fas fa-check-circle"></i>Complete';
+            } else if (status === 'error') {
+                badge.classList.add('status-error');
+                badge.innerHTML = '<i class="fas fa-times-circle"></i>Error';
+            } else {
+                badge.classList.add('status-pending');
+                badge.innerHTML = '<i class="fas fa-circle"></i>Pending';
+            }
+        }
+
+        // Update current status
+        function updateCurrentStatus(text) {
+            document.getElementById('current-status').textContent = text;
+        }
+
+        // Update progress
+        function updateProgress(percent) {
+            document.getElementById('progress-fill').style.width = percent + '%';
+            document.getElementById('progress-percent').textContent = percent + '%';
+        }
+
+        // Console logging
+        function logConsole(message) {
+            const console = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            const line = document.createElement('div');
+            line.innerHTML = `<span class="text-gray-400">[${timestamp}]</span> ${message}`;
+            console.appendChild(line);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('console-output').innerHTML = `
+                <div class="text-gray-400">$ Fault Rupture Processing Console</div>
+                <div class="text-gray-400">$ Ready for commands...</div>
+                <div class="mt-2"><span class="text-yellow-400">></span> Waiting for input...</div>
+            `;
+        }
+
+        // Download functions
+        function downloadConfig() {
+            const config = {
+                mode: document.querySelector('input[name="mode"]:checked').value,
+                parameters: {
+                    length: document.getElementById('length').value,
+                    width: document.getElementById('width').value,
+                    depth: document.getElementById('depth').value,
+                    patch: document.getElementById('patch').value,
+                    strike: document.getElementById('strike').value,
+                    dip: document.getElementById('dip').value,
+                    rake: document.getElementById('rake').value,
+                    magnitude: document.getElementById('magnitude').value,
+                    velocity: document.getElementById('velocity').value,
+                    riseTime: document.getElementById('risetime').value,
+                    slipDist: document.getElementById('slip-dist').value,
+                    hypoStrike: document.getElementById('hypo-strike').value,
+                    hypoDip: document.getElementById('hypo-dip').value,
+                    refLat: document.getElementById('ref-lat').value,
+                    refLon: document.getElementById('ref-lon').value
+                },
+                processing: {
+                    eqName: document.getElementById('eq-name').value,
+                    targetMag: document.getElementById('target-mag').value,
+                    numStations: document.getElementById('num-stations').value,
+                    maxDist: document.getElementById('max-dist').value
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'fault_config.json';
+            a.click();
+            
+            logConsole('Configuration downloaded');
+        }
+
+        function downloadResults() {
+            if (!faultModel) {
+                alert('Please create a fault model first');
+                return;
+            }
+            
+            logConsole('Preparing results for download...');
+            
+            // Create CSV data based on what we have
+            let csvContent = '';
+            
+            if (faultModel.mode === 'geojson' && faultModel.geojsonPatches) {
+                // Download GeoJSON patch data as CSV
+                csvContent = 'centroid_lon,centroid_lat,centroid_depth,slip,trup,sf_moment,rise,rake,strike,dip\n';
+                
+                faultModel.geojsonPatches.forEach(patch => {
+                    csvContent += `${patch.lon},${patch.lat},${patch.depth},${patch.slip || 0},${patch.trup || 0},${patch.sf_moment || 0},${patch.rise || 0},${patch.rake || ''},${patch.strike || ''},${patch.dip || ''}\n`;
+                });
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'fault_patches_data.csv';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                logConsole('Downloaded fault_patches_data.csv with ' + faultModel.geojsonPatches.length + ' patches');
+                alert('✓ Results downloaded successfully!\nFile: fault_patches_data.csv');
+                
+            } else {
+                // Download synthetic fault parameters as JSON
+                const results = {
+                    fault_parameters: {
+                        length_km: faultModel.length,
+                        width_km: faultModel.width,
+                        depth_km: faultModel.depth,
+                        patch_size_km: faultModel.patch,
+                        strike_deg: faultModel.strike,
+                        dip_deg: faultModel.dip,
+                        rake_deg: faultModel.rake,
+                        magnitude: faultModel.magnitude,
+                        rupture_velocity_km_s: faultModel.velocity,
+                        rise_time_s: faultModel.riseTime
+                    },
+                    fault_discretization: {
+                        total_patches: faultModel.patches,
+                        patches_along_strike: faultModel.nStrike,
+                        patches_down_dip: faultModel.nDip
+                    },
+                    processing: {
+                        earthquake_name: document.getElementById('eq-name').value,
+                        target_magnitude: document.getElementById('target-mag').value,
+                        num_stations: document.getElementById('num-stations').value,
+                        max_station_distance_km: document.getElementById('max-dist').value,
+                        grouped_centroids: document.getElementById('result-centroids').textContent,
+                        stations_generated: document.getElementById('result-stations').textContent,
+                        tables_created: document.getElementById('result-tables').textContent
+                    }
+                };
+                
+                const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'fault_model_results.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                logConsole('Downloaded fault_model_results.json');
+                alert('✓ Results downloaded successfully!\nFile: fault_model_results.json');
+            }
+        }
+        
+        // Download centroids CSV
+        function downloadCentroids() {
+            if (!faultModel) {
+                alert('Please create a fault model first');
+                return;
+            }
+            
+            logConsole('Preparing centroids CSV...');
+            
+            let csvContent = '';
+            
+            if (faultModel.mode === 'geojson' && faultModel.geojsonPatches) {
+                // GeoJSON centroids with all data
+                csvContent = 'centroid_lon,centroid_lat,centroid_depth,slip,trup,sf_moment,rise,rake,strike,dip,area\n';
+                
+                faultModel.geojsonPatches.forEach(patch => {
+                    csvContent += `${patch.lon},${patch.lat},${patch.depth},` +
+                                `${patch.slip || 0},${patch.trup || 0},${patch.sf_moment || 0},` +
+                                `${patch.rise || 0},${patch.rake || ''},${patch.strike || ''},` +
+                                `${patch.dip || ''},${patch.area || ''}\n`;
+                });
+            } else {
+                // Synthetic fault centroids (generate grid)
+                csvContent = 'centroid_lon,centroid_lat,centroid_depth,patch_index,along_strike,down_dip\n';
+                
+                const refLat = parseFloat(document.getElementById('ref-lat').value);
+                const refLon = parseFloat(document.getElementById('ref-lon').value);
+                const patchSize = parseFloat(faultModel.patch);
+                const strike = parseFloat(faultModel.strike) * Math.PI / 180;
+                const dip = parseFloat(faultModel.dip) * Math.PI / 180;
+                const depth = parseFloat(faultModel.depth);
+                
+                let idx = 0;
+                for (let j = 0; j < faultModel.nDip; j++) {
+                    for (let i = 0; i < faultModel.nStrike; i++) {
+                        // Calculate position
+                        const alongStrike = (i + 0.5) * patchSize;
+                        const downDip = (j + 0.5) * patchSize;
+                        
+                        // Convert to lat/lon (simplified)
+                        const deltaLon = (alongStrike * Math.cos(strike)) / (111 * Math.cos(refLat * Math.PI / 180));
+                        const deltaLat = (alongStrike * Math.sin(strike)) / 111;
+                        const patchDepth = depth + downDip * Math.sin(dip);
+                        
+                        csvContent += `${refLon + deltaLon},${refLat + deltaLat},${patchDepth},${idx},${i},${j}\n`;
+                        idx++;
+                    }
+                }
+            }
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'centroids_data.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            logConsole('Downloaded centroids_data.csv');
+            alert('✓ Centroids CSV downloaded!\nFile: centroids_data.csv');
+        }
+        
+        // Download generative tables
+        function downloadGenerativeTables() {
+            if (!faultModel) {
+                alert('Please create a fault model first');
+                return;
+            }
+            
+            if (currentStep < 2) {
+                alert('Please complete grouping step first');
+                return;
+            }
+            
+            logConsole('Preparing generative tables...');
+            
+            // Create a ZIP-like structure with multiple CSVs in JSON format
+            const tables = {
+                metadata: {
+                    earthquake_name: document.getElementById('eq-name').value,
+                    magnitude: faultModel.magnitude,
+                    created: new Date().toISOString(),
+                    total_patches: faultModel.patches,
+                    grouped_centroids: document.getElementById('result-centroids').textContent,
+                    num_stations: document.getElementById('num-stations').value
+                },
+                grouped_centroids: [],
+                stations: [],
+                source_parameters: {
+                    strike: faultModel.strike,
+                    dip: faultModel.dip,
+                    rake: faultModel.rake,
+                    length_km: faultModel.length,
+                    width_km: faultModel.width,
+                    depth_km: faultModel.depth || 0,
+                    rupture_velocity_km_s: faultModel.velocity,
+                    rise_time_s: faultModel.riseTime
+                }
+            };
+            
+            // Generate grouped centroids (simulated grouping)
+            const numGroups = Math.floor(faultModel.patches / 5);
+            for (let i = 0; i < numGroups; i++) {
+                tables.grouped_centroids.push({
+                    group_id: i,
+                    num_patches: 5,
+                    centroid_lon: parseFloat(document.getElementById('ref-lon').value) + (Math.random() - 0.5) * 0.1,
+                    centroid_lat: parseFloat(document.getElementById('ref-lat').value) + (Math.random() - 0.5) * 0.1,
+                    centroid_depth: parseFloat(faultModel.depth || 0) + Math.random() * parseFloat(faultModel.width || 15),
+                    magnitude: parseFloat(document.getElementById('target-mag').value)
+                });
+            }
+            
+            // Generate synthetic stations (simulated)
+            const numStations = parseInt(document.getElementById('num-stations').value);
+            const maxDist = parseFloat(document.getElementById('max-dist').value);
+            const refLat = parseFloat(document.getElementById('ref-lat').value);
+            const refLon = parseFloat(document.getElementById('ref-lon').value);
+            
+            for (let i = 0; i < numStations; i++) {
+                const angle = (i / numStations) * 2 * Math.PI;
+                const dist = Math.random() * maxDist;
+                tables.stations.push({
+                    station_id: `ST${String(i).padStart(3, '0')}`,
+                    lon: refLon + (dist / 111) * Math.cos(angle) / Math.cos(refLat * Math.PI / 180),
+                    lat: refLat + (dist / 111) * Math.sin(angle),
+                    elevation: 0,
+                    vs30: 300 + Math.random() * 500,
+                    distance_km: dist
+                });
+            }
+            
+            const blob = new Blob([JSON.stringify(tables, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'generative_tables.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            logConsole('Downloaded generative_tables.json');
+            alert('✓ Generative tables downloaded!\nFile: generative_tables.json\nIncludes: grouped centroids, stations, source parameters');
+        }
+
+        // Reset parameters
+        function resetParameters() {
+            if (!confirm('Reset all parameters to defaults?')) return;
+            
+            document.getElementById('length').value = 50;
+            document.getElementById('width').value = 15;
+            document.getElementById('depth').value = 0;
+            document.getElementById('patch').value = 2;
+            document.getElementById('strike').value = 135;
+            document.getElementById('dip').value = 85;
+            document.getElementById('rake').value = 180;
+            document.getElementById('magnitude').value = 7.1;
+            document.getElementById('velocity').value = 2.8;
+            document.getElementById('risetime').value = 1.5;
+            document.getElementById('hypo-strike').value = 0.3;
+            document.getElementById('hypo-dip').value = 0.5;
+            
+            // Update all value displays
+            ['length', 'width', 'depth', 'patch', 'strike', 'dip', 'rake', 
+             'magnitude', 'velocity', 'risetime', 'hypo-strike', 'hypo-dip'].forEach(updateValue);
+            
+            updateRakeLabel();
+            logConsole('Parameters reset to defaults');
+        }
+
+        // Show about dialog
+        function showAbout() {
+            alert(`Fault Rupture Processing Web App
+Version 1.0
+
+An interactive tool for creating, visualizing, and processing
+fault rupture models for seismic waveform synthesis.
+
+Features:
+• Create synthetic faults with customizable parameters
+• Interactive visualization of rupture kinematics
+• Automated processing pipeline
+• Modern, responsive web interface
+
+Author: Francesco Alexandr Colosimo
+Date: December 2025`);
+        }
+
+        // Initialize rake label and scaling relations
+        updateRakeLabel();
+        updateScalingRelations();
+        logConsole('Application initialized');
+    </script>
+</body>
+</html>

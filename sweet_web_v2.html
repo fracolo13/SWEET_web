@@ -1,0 +1,2718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SWEET - Seismic Waveform Emulator</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .tab-button {
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+        .tab-button.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+            font-weight: 600;
+        }
+        .tab-button:hover {
+            background-color: #f3f4f6;
+        }
+        .mode-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .mode-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+    
+    <!-- HEADER -->
+    <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-chart-area text-3xl"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold">SWEET</h1>
+                        <p class="text-xs text-blue-100">Finite fault waveform simulation tool</p>
+                    </div>
+                </div>
+                <!-- Progress Steps -->
+                <div id="progress-steps" class="flex items-center space-x-2 hidden">
+                    <div class="flex items-center">
+                        <div id="step-1" class="flex items-center">
+                            <div class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-sm font-bold">1</div>
+                            <span class="ml-2 text-sm font-medium">Geometry</span>
+                        </div>
+                        <div class="mx-2 text-white/50">→</div>
+                        <div id="step-2" class="flex items-center">
+                            <div class="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold">2</div>
+                            <span class="ml-2 text-sm font-medium text-white/50">Kinematics</span>
+                        </div>
+                        <div class="mx-2 text-white/50">→</div>
+                        <div id="step-3" class="flex items-center">
+                            <div class="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold">3</div>
+                            <span class="ml-2 text-sm font-medium text-white/50">Subsources</span>
+                        </div>
+                        <div class="mx-2 text-white/50">→</div>
+                        <div id="step-4" class="flex items-center">
+                            <div class="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold">4</div>
+                            <span class="ml-2 text-sm font-medium text-white/50">Spatial Setup</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- About Button -->
+                <button id="about-btn" onclick="showAbout()" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition flex items-center font-medium text-sm">
+                    <i class="fas fa-info-circle mr-2"></i>About
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- LANDING PAGE -->
+    <div id="landing-page" class="container mx-auto px-6 py-12 flex-grow">
+        <div class="max-w-4xl mx-auto">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">Welcome to SWEET</h2>
+                <p class="text-lg text-gray-600">Choose how you want to define your seismic fault</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- GeoJSON Mode Card -->
+                <div class="mode-card bg-white rounded-xl shadow-lg p-8" onclick="selectMode('geojson')">
+                    <div class="text-center">
+                        <div class="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-map text-4xl text-blue-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-3">Load from GeoJSON</h3>
+                        <p class="text-gray-600 mb-4">Import an existing fault geometry from a GeoJSON file</p>
+                        <ul class="text-sm text-gray-500 text-left space-y-2">
+                            <li><i class="fas fa-check text-green-500 mr-2"></i>Use real fault traces</li>
+                            <li><i class="fas fa-check text-green-500 mr-2"></i>Complex geometries</li>
+                            <li><i class="fas fa-check text-green-500 mr-2"></i>Multiple segments</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Synthetic Mode Card -->
+                <div class="mode-card bg-white rounded-xl shadow-lg p-8" onclick="selectMode('synthetic')">
+                    <div class="text-center">
+                        <div class="bg-purple-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-sliders-h text-4xl text-purple-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-3">Generate Synthetic</h3>
+                        <p class="text-gray-600 mb-4">Create a simple rectangular fault with custom parameters</p>
+                        <ul class="text-sm text-gray-500 text-left space-y-2">
+                            <li><i class="fas fa-check text-green-500 mr-2"></i>Quick setup</li>
+                            <li><i class="fas fa-check text-green-500 mr-2"></i>Adjustable parameters</li>
+                            <li><i class="fas fa-check text-green-500 mr-2"></i>Real-time preview</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="about-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-2xl">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-bold flex items-center">
+                        <i class="fas fa-info-circle mr-3"></i>
+                        About SWEET
+                    </h2>
+                    <button onclick="closeAbout()" class="text-white hover:text-gray-200 transition text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-8 space-y-6">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-3">Synthetic Waveform Emulator for Earthquake Testing</h3>
+                    <p class="text-gray-700 leading-relaxed">
+                        SWEET is an interactive web application for finite fault modeling and synthetic seismic waveform generation. 
+                        The tool allows users to design custom earthquake rupture scenarios through an intuitive multi-step workflow, 
+                        from fault geometry definition to kinematic parameter specification, subsource grouping, and spatial station setup.
+                    </p>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Key Features</h3>
+                    <ul class="list-disc list-inside space-y-2 text-gray-700">
+                        <li>Interactive fault geometry design with plane or listric modes</li>
+                        <li>Customizable kinematic parameters (slip, rake, rise time, rupture velocity)</li>
+                        <li>Moment-based subsource grouping for waveform synthesis</li>
+                        <li>Real-time visualization of fault model, slip distribution, and source time functions</li>
+                        <li>Spatial station configuration for waveform computation</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Workflow</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">1. Geometry</span>
+                        <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">2. Kinematics</span>
+                        <span class="px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm font-medium">3. Subsources</span>
+                        <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">4. Spatial Setup</span>
+                    </div>
+                </div>
+                
+                <div class="border-t pt-6 mt-6">
+                    <p class="text-gray-600 text-sm">
+                        <strong>Author:</strong> Francesco Acolosimo<br>
+                        <strong>Year:</strong> 2025<br>
+                        <strong>Version:</strong> 1.0
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN WORKSPACE (Hidden initially) -->
+    <div id="workspace" class="hidden flex-grow">
+        <div class="container-fluid mx-auto px-6 py-6">
+            <div class="flex flex-col md:flex-row gap-6" style="height: calc(100vh - 240px);">
+                
+                <!-- LEFT PANEL (30%) - INPUTS -->
+                <div class="w-full md:w-1/3 border-r border-gray-200 overflow-hidden relative" style="max-height: calc(100vh - 240px);">
+                    
+                    <!-- Geometry Panel -->
+                    <div id="geometry-panel" class="transition-transform duration-500 ease-in-out overflow-y-auto" style="transform: translateX(0); height: 100%;">
+                        <div class="p-6">
+                    
+                        <!-- GeoJSON Mode -->
+                        <div id="geojson-inputs" class="hidden">
+                            <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                                <i class="fas fa-map mr-3 text-blue-600"></i>
+                                Load GeoJSON
+                            </h3>
+                            
+                            <div class="mb-6">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Select GeoJSON File</label>
+                                <input type="file" id="geojson-file" accept=".geojson,.json" class="w-full px-3 py-2 border border-gray-300 rounded">
+                            </div>
+                            
+                            <button onclick="loadGeoJSON()" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition shadow-lg">
+                                <i class="fas fa-upload mr-2"></i>Load File
+                            </button>
+                        </div>
+                        
+                        <!-- Synthetic Mode -->
+                        <div id="synthetic-inputs" class="hidden">
+                            <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                                <i class="fas fa-cogs mr-3 text-purple-600"></i>
+                                Fault Parameters
+                            </h3>
+                            
+                            <!-- Geometry Section -->
+                            <div class="mb-6">
+                                <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
+                                    <i class="fas fa-ruler-combined mr-2 text-blue-500"></i>
+                                    Geometry
+                                </h4>
+                                
+                                <!-- Length -->
+                                <div class="mb-5 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                                    <label class="block text-sm font-semibold text-gray-800 mb-3">Length (km)</label>
+                                    <div class="flex items-center space-x-3">
+                                        <input type="range" id="length" min="10" max="1000" value="100" oninput="updateValue('length')" class="flex-1">
+                                        <input type="number" id="length-val" min="10" max="1000" value="100" class="w-24 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-medium focus:border-blue-500 focus:outline-none" oninput="syncSlider('length')">
+                                    </div>
+                                </div>
+                                
+                                <!-- Width -->
+                                <div class="mb-5 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                                    <label class="block text-sm font-semibold text-gray-800 mb-3">Width (km)</label>
+                                    <div class="flex items-center space-x-3">
+                                        <input type="range" id="width" min="5" max="200" value="30" oninput="updateValue('width')" class="flex-1">
+                                        <input type="number" id="width-val" min="5" max="200" value="30" class="w-24 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-medium focus:border-blue-500 focus:outline-none" oninput="syncSlider('width')">
+                                    </div>
+                                </div>
+                                
+                                <!-- Dip -->
+                                <div class="mb-5 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                                    <label class="block text-sm font-semibold text-gray-800 mb-3">Dip (°)</label>
+                                    <div class="flex items-center space-x-3">
+                                        <input type="range" id="dip" min="0" max="90" value="45" oninput="updateValue('dip')" class="flex-1">
+                                        <input type="number" id="dip-val" min="0" max="90" value="45" class="w-20 px-2 py-1 border border-gray-300 rounded text-center" oninput="syncSlider('dip')">
+                                    </div>
+                                </div>
+                                
+                                <!-- Top Depth -->
+                                <div class="mb-5 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                                    <label class="block text-sm font-semibold text-gray-800 mb-3">Top Depth (km)</label>
+                                    <div class="flex items-center space-x-3">
+                                        <input type="range" id="top-depth" min="0" max="50" value="5" oninput="updateValue('top-depth')" class="flex-1">
+                                        <input type="number" id="top-depth-val" min="0" max="50" value="5" class="w-24 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-medium focus:border-blue-500 focus:outline-none" oninput="syncSlider('top-depth')">
+                                    </div>
+                                </div>
+                                
+                                <!-- Patch Size -->
+                                <div class="mb-5 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                                    <label class="block text-sm font-semibold text-gray-800 mb-3">Patch Size (km)</label>
+                                    <div class="flex items-center space-x-3">
+                                        <input type="range" id="patch-size" min="1" max="20" value="5" oninput="updateValue('patch-size')" class="flex-1">
+                                        <input type="number" id="patch-size-val" min="1" max="20" value="5" class="w-24 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-medium focus:border-blue-500 focus:outline-none" oninput="syncSlider('patch-size')">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        </div>
+                    </div>
+                    
+                    <!-- Kinematics Panel -->
+                    <div id="kinematics-panel" class="transition-transform duration-500 ease-in-out absolute top-0 left-0 w-full overflow-y-auto" style="transform: translateX(100%); height: 100%;">
+                        <div class="p-6">
+                        
+                        <div class="mb-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center">
+                                <i class="fas fa-bolt mr-3 text-purple-600"></i>
+                                Fault Kinematics
+                            </h3>
+                            <p class="text-sm text-gray-600">Define rupture characteristics and slip distribution</p>
+                        </div>
+                        
+                        <!-- Rupture Parameters Section -->
+                        <div id="rupture-params" class="mb-6">
+                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-bolt mr-2 text-green-500"></i>
+                                Rupture Parameters
+                            </h4>
+                            
+                            <!-- Rake -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Rake (°)</label>
+                                <div class="flex items-center space-x-3">
+                                    <input type="range" id="rake" min="-180" max="180" value="90" oninput="updateValue('rake'); updateRakeMechanism()" class="flex-1">
+                                    <input type="number" id="rake-val" min="-180" max="180" value="90" class="w-20 px-2 py-1 border border-gray-300 rounded text-center" oninput="syncSlider('rake'); updateRakeMechanism()">
+                                </div>
+                                <div id="rake-mechanism" class="text-xs text-blue-600 mt-1 font-medium">Reverse/Thrust fault</div>
+                            </div>
+                            
+                            <!-- Event Magnitude -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2" id="magnitude-label">Event Magnitude (Mw)</label>
+                                <div class="flex items-center space-x-3">
+                                    <input type="range" id="magnitude" min="5.0" max="9.0" step="0.1" value="7.0" oninput="updateValue('magnitude')" class="flex-1">
+                                    <input type="number" id="magnitude-val" min="5.0" max="9.0" step="0.1" value="7.0" class="w-20 px-2 py-1 border border-gray-300 rounded text-center" oninput="syncSlider('magnitude')">
+                                </div>
+                                <p id="magnitude-info" class="text-xs text-blue-600 mt-1 hidden"></p>
+                            </div>
+                            
+                            <!-- Slip Distribution -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Slip Distribution</label>
+                                <select id="slip-dist" class="w-full px-3 py-2 border border-gray-300 rounded">
+                                    <option value="uniform">Uniform</option>
+                                    <option value="random">Random</option>
+                                    <option value="gaussian" selected>Gaussian</option>
+                                    <option value="asperity">Asperity</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Hypocenter Location -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Hypocenter Along-Strike: <span id="hypo-along-value" class="text-blue-600 font-semibold">0.5</span>
+                                </label>
+                                <input type="range" id="hypo-along" min="0" max="1" step="0.01" value="0.5" class="w-full" oninput="document.getElementById('hypo-along-value').textContent = parseFloat(this.value).toFixed(2)">
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Hypocenter Down-Dip: <span id="hypo-down-value" class="text-blue-600 font-semibold">0.5</span>
+                                </label>
+                                <input type="range" id="hypo-down" min="0" max="1" step="0.01" value="0.5" class="w-full" oninput="document.getElementById('hypo-down-value').textContent = parseFloat(this.value).toFixed(2)">
+                            </div>
+                            
+                            <!-- Rupture Velocity -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Rupture Velocity: <span id="rupture-vel-value" class="text-blue-600 font-semibold">3.0</span> km/s
+                                </label>
+                                <input type="range" id="rupture-vel" min="1.5" max="4.5" step="0.1" value="3.0" class="w-full" oninput="document.getElementById('rupture-vel-value').textContent = parseFloat(this.value).toFixed(1)">
+                            </div>
+                        </div>
+                        
+                        </div>
+                    </div>
+                    
+                    <!-- Subsources Panel -->
+                    <div id="subsources-panel" class="transition-transform duration-500 ease-in-out absolute top-0 left-0 w-full overflow-y-auto" style="transform: translateX(100%); height: 100%;">
+                        <div class="p-6">
+                        
+                        <div class="mb-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center">
+                                <i class="fas fa-layer-group mr-3 text-indigo-600"></i>
+                                Subsources Selection
+                            </h3>
+                            <p class="text-sm text-gray-600">Select fault patches to use as subsources for waveform computation</p>
+                        </div>
+                        
+                        <!-- Subsources Configuration Section -->
+                        <div class="mb-6">
+                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-cogs mr-2 text-purple-500"></i>
+                                Subsource Grouping
+                            </h4>
+                            
+                            <!-- Subsource Magnitude Slider -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Target Subsource Magnitude: <span id="subsource-mag-value" class="text-blue-600 font-semibold">6.0</span>
+                                </label>
+                                <input type="range" id="subsource-magnitude" min="5.0" max="6.5" step="0.1" value="6.0" class="w-full" oninput="updateSubsourceGrouping()">
+                                <p class="text-xs text-gray-500 mt-1">Patches will be grouped to reach this target magnitude</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Subsources Summary -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                            <h5 class="font-semibold text-blue-800 mb-2 text-sm">Subsource Groups</h5>
+                            <div class="text-sm text-gray-700 space-y-1">
+                                <p><span class="font-medium">Total Patches:</span> <span id="total-patches">-</span></p>
+                                <p><span class="font-medium">Number of Subsources:</span> <span id="selected-patches" class="text-lg font-bold text-blue-600">-</span></p>
+                                <p><span class="font-medium">Avg Patches per Subsource:</span> <span id="subsource-coverage">-</span></p>
+                            </div>
+                        </div>
+                        
+                        <!-- Magnitude Distribution Histogram -->
+                        <div class="bg-white border border-gray-300 rounded-lg p-4 mb-4">
+                            <h5 class="font-semibold text-gray-800 mb-3 text-sm">Subsource Magnitude Distribution</h5>
+                            <div id="magnitude-histogram" style="height: 300px;"></div>
+                        </div>
+                        
+                        </div>
+                    </div>
+                    
+                    <!-- Spatial Setup Panel -->
+                    <div id="spatial-panel" class="transition-transform duration-500 ease-in-out absolute top-0 left-0 w-full overflow-y-auto" style="transform: translateX(100%); height: 100%;">
+                        <div class="p-6">
+                        
+                        <div class="mb-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center">
+                                <i class="fas fa-map-marker-alt mr-3 text-orange-600"></i>
+                                Spatial Setup
+                            </h3>
+                            <p class="text-sm text-gray-600">Define fault location and station network</p>
+                        </div>
+                        
+                        <!-- Fault Location Section -->
+                        <div class="mb-6">
+                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-compass mr-2 text-blue-500"></i>
+                                Fault Location
+                            </h4>
+                            
+                            <!-- Hypocenter Latitude -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Hypocenter Latitude (°)</label>
+                                <input type="number" id="hypo-lat" value="35.0" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded" oninput="visualizeMap()">
+                            </div>
+                            
+                            <!-- Hypocenter Longitude -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Hypocenter Longitude (°)</label>
+                                <input type="number" id="hypo-lon" value="-118.0" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded" oninput="visualizeMap()">
+                            </div>
+                            
+                            <!-- Strike -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Strike: <span id="strike-value" class="text-blue-600 font-semibold">0</span>° (N→E)
+                                </label>
+                                <input type="range" id="strike" min="0" max="360" step="5" value="0" class="w-full" oninput="document.getElementById('strike-value').textContent = this.value; visualizeMap()">
+                            </div>
+                        </div>
+                        
+                        <!-- Station Network Section -->
+                        <div class="mb-6">
+                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-broadcast-tower mr-2 text-green-500"></i>
+                                Station Network
+                            </h4>
+                            
+                            <!-- Number of Stations -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Number of Stations: <span id="num-stations-value" class="text-blue-600 font-semibold">10</span>
+                                </label>
+                                <input type="range" id="num-stations" min="5" max="200" step="5" value="10" class="w-full" oninput="document.getElementById('num-stations-value').textContent = this.value">
+                            </div>
+                            
+                            <!-- Max Distance -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Max Distance: <span id="max-distance-value" class="text-blue-600 font-semibold">200</span> km
+                                </label>
+                                <input type="range" id="max-distance" min="50" max="200" step="10" value="200" class="w-full" oninput="document.getElementById('max-distance-value').textContent = this.value">
+                            </div>
+                            
+                            <!-- Station Network Buttons -->
+                            <div class="flex gap-3 mb-4">
+                                <button onclick="generateRandomStations()" class="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition shadow">
+                                    <i class="fas fa-random mr-2"></i>Generate Random
+                                </button>
+                                <button onclick="loadStationFile()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition shadow">
+                                    <i class="fas fa-upload mr-2"></i>Load CSV
+                                </button>
+                            </div>
+                            
+                            <!-- Station List Display -->
+                            <div id="station-list" class="bg-gray-50 border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto hidden">
+                                <h5 class="text-xs font-semibold text-gray-700 mb-2">Stations (<span id="station-count">0</span>)</h5>
+                                <div id="station-items" class="text-xs text-gray-600 space-y-1"></div>
+                            </div>
+                        </div>
+                        
+                        </div>
+                    </div>
+                    
+                </div>
+                
+                <!-- RIGHT PANEL (70%) - VISUALIZATION -->
+                <div class="w-full md:w-2/3 flex flex-col">
+                    
+                    <!-- Kinematics Controls (shown at top when in kinematics mode) -->
+                    <div id="kinematics-controls" class="hidden bg-white border-b border-gray-200 p-4">
+                        <div class="flex flex-wrap gap-4 items-start">
+                            <!-- Visualization Selector -->
+                            <div id="kinematics-viz-selector" class="w-auto min-w-[180px] hidden">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Visualization Type</label>
+                                <select id="kinematics-viz-type" class="w-auto px-3 py-2 border border-gray-300 rounded" onchange="updateKinematicsVisualization()">
+                                    <option value="slip">Slip Distribution</option>
+                                    <option value="moment" selected>Moment Release</option>
+                                    <option value="rupture-time">Rupture Time</option>
+                                    <option value="stf">Source Time Function</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Computed Results Summary -->
+                            <div id="computed-summary" class="hidden bg-green-50 border border-green-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-green-800 mb-2 text-sm">Computed Results</h4>
+                                <div class="text-sm text-gray-700 space-y-1.5">
+                                    <p><span class="font-medium">Avg Slip:</span> <span id="avg-slip-display" class="font-semibold">-</span> m</p>
+                                    <p><span class="font-medium">Total M₀:</span> <span id="total-moment-display" class="font-semibold">-</span> N·m</p>
+                                    <p><span class="font-medium">Computed Mw:</span> <span id="computed-mw-display" class="font-semibold">-</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabs -->
+                    <div id="tabs-container" class="flex border-b border-gray-200 bg-white">
+                        <button id="tab-geometry" class="tab-button px-6 py-3 active" onclick="switchTab('geometry')">
+                            <i class="fas fa-cube mr-2"></i>Geometry
+                        </button>
+                    </div>
+                    
+                    <!-- Visualization Content -->
+                    <div class="flex-1 overflow-auto bg-gray-50">
+                        <div id="plot-container" class="w-full h-full p-2" style="min-height: 600px;">
+                        </div>
+                    </div>
+                    
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="bg-gray-800 text-white py-4 mt-auto">
+        <div class="container-fluid mx-auto px-6">
+            <div class="flex justify-between items-center">
+                <div class="flex gap-3">
+                    <button onclick="goHome()" class="px-5 py-2.5 text-white hover:text-gray-200 bg-gray-700 hover:bg-gray-600 rounded-lg transition flex items-center font-medium shadow-md">
+                        <i class="fas fa-home mr-2"></i>Home
+                    </button>
+                    <button id="confirm-geometry-btn" onclick="confirmGeometry()" class="px-5 py-2.5 text-white hover:text-gray-200 bg-green-600 hover:bg-green-700 rounded-lg transition flex items-center font-medium shadow-md hidden">
+                        <i class="fas fa-check mr-2"></i>Confirm Geometry
+                    </button>
+                    <button id="back-to-geometry-btn" onclick="backToGeometry()" class="px-5 py-2.5 text-white hover:text-gray-200 bg-blue-600 hover:bg-blue-500 rounded-lg transition flex items-center font-medium shadow-md hidden">
+                        <i class="fas fa-arrow-left mr-2"></i><span id="back-button-text">Back to Geometry</span>
+                    </button>
+                    <button id="compute-kinematics-btn" onclick="computeKinematics()" class="px-5 py-2.5 text-white hover:text-gray-200 bg-purple-600 hover:bg-purple-700 rounded-lg transition flex items-center font-medium shadow-md hidden">
+                        <i class="fas fa-calculator mr-2"></i>Compute Kinematics
+                    </button>
+                    <button id="proceed-subsources-btn" onclick="proceedToSubsources()" class="px-6 py-2.5 bg-green-600 text-white hover:bg-green-500 rounded-lg transition flex items-center font-semibold shadow-md hidden">
+                        Select Subsources<i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                    <button id="proceed-network-btn" onclick="proceedToSpatialSetup()" class="px-6 py-2.5 bg-green-600 text-white hover:bg-green-500 rounded-lg transition flex items-center font-semibold shadow-md hidden">
+                        Spatial Setup<i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+                <div class="text-sm text-gray-300">
+                    © 2025 SWEET - Finite fault waveform simulation tool
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        let currentMode = null;
+        let currentTab = 'geometry';
+        let faultData = null;
+        
+        // Update progress steps indicator
+        function updateProgressSteps(step) {
+            // Show progress steps
+            document.getElementById('progress-steps').classList.remove('hidden');
+            
+            // Reset all steps
+            for (let i = 1; i <= 4; i++) {
+                const stepEl = document.getElementById(`step-${i}`);
+                const circle = stepEl.querySelector('div');
+                const label = stepEl.querySelector('span');
+                
+                if (i < step) {
+                    // Completed step
+                    circle.className = 'w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-sm font-bold';
+                    label.className = 'ml-2 text-sm font-medium';
+                } else if (i === step) {
+                    // Current step
+                    circle.className = 'w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center text-sm font-bold text-gray-900';
+                    label.className = 'ml-2 text-sm font-medium';
+                } else {
+                    // Future step
+                    circle.className = 'w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold';
+                    label.className = 'ml-2 text-sm font-medium text-white/50';
+                }
+            }
+        }
+
+        // Mode selection
+        function selectMode(mode) {
+            currentMode = mode;
+            document.getElementById('landing-page').classList.add('hidden');
+            document.getElementById('workspace').classList.remove('hidden');
+            
+            // Initialize rake mechanism label
+            updateRakeMechanism();
+            
+            // Update progress to step 1
+            updateProgressSteps(1);
+            
+            // Show confirm geometry button
+            document.getElementById('confirm-geometry-btn').classList.remove('hidden');
+            
+            if (mode === 'geojson') {
+                document.getElementById('geojson-inputs').classList.remove('hidden');
+                document.getElementById('synthetic-inputs').classList.add('hidden');
+            } else {
+                document.getElementById('geojson-inputs').classList.add('hidden');
+                document.getElementById('synthetic-inputs').classList.remove('hidden');
+                previewGeometry();
+            }
+        }
+
+        // Tab switching
+        function switchTab(tab) {
+            currentTab = tab;
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach((btn, index) => {
+                btn.classList.remove('active');
+                if ((tab === 'geometry' && index === 0) || 
+                    (tab === 'slip' && index === 1) || 
+                    (tab === 'moment' && index === 2)) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            if (faultData) {
+                visualize(tab);
+            }
+        }
+
+        // Slider synchronization
+        function updateValue(id) {
+            const slider = document.getElementById(id);
+            const input = document.getElementById(id + '-val');
+            input.value = slider.value;
+            
+            if (currentMode === 'synthetic') {
+                const kinematicsVisible = document.getElementById('kinematics-panel').style.transform === 'translateX(0px)';
+                
+                // If kinematics panel is NOT visible, preview geometry only
+                if (!kinematicsVisible) {
+                    previewGeometry();
+                }
+                // In kinematics mode, parameters don't auto-regenerate - user must click Compute
+            }
+        }
+        
+        function syncSlider(id) {
+            const slider = document.getElementById(id);
+            const input = document.getElementById(id + '-val');
+            slider.value = input.value;
+            
+            if (currentMode === 'synthetic') {
+                const kinematicsVisible = document.getElementById('kinematics-panel').style.transform === 'translateX(0px)';
+                
+                // If kinematics panel is NOT visible, preview geometry only
+                if (!kinematicsVisible) {
+                    previewGeometry();
+                }
+                // In kinematics mode, parameters don't auto-regenerate - user must click Compute
+            }
+        }
+        
+        // Update rake mechanism label
+        function updateRakeMechanism() {
+            const rake = parseFloat(document.getElementById('rake').value);
+            const mechanismDiv = document.getElementById('rake-mechanism');
+            
+            let mechanism;
+            if ((rake >= -45 && rake <= 45) || rake >= 135 || rake <= -135) {
+                // Strike-slip
+                if (rake >= -22.5 && rake <= 22.5) {
+                    mechanism = 'Left-lateral strike-slip';
+                } else if ((rake >= 157.5 && rake <= 180) || (rake >= -180 && rake <= -157.5)) {
+                    mechanism = 'Right-lateral strike-slip';
+                } else if (rake > 22.5 && rake < 45) {
+                    mechanism = 'Oblique left-lateral (thrust component)';
+                } else if (rake < -22.5 && rake > -45) {
+                    mechanism = 'Oblique left-lateral (normal component)';
+                } else if (rake > 135 && rake < 157.5) {
+                    mechanism = 'Oblique right-lateral (thrust component)';
+                } else {
+                    mechanism = 'Oblique right-lateral (normal component)';
+                }
+            } else if (rake > 45 && rake < 135) {
+                // Reverse/Thrust
+                if (rake >= 85 && rake <= 95) {
+                    mechanism = 'Pure reverse/thrust fault';
+                } else if (rake > 45 && rake < 85) {
+                    mechanism = 'Oblique reverse (right-lateral component)';
+                } else {
+                    mechanism = 'Oblique reverse (left-lateral component)';
+                }
+            } else {
+                // Normal
+                if (rake >= -95 && rake <= -85) {
+                    mechanism = 'Pure normal fault';
+                } else if (rake > -135 && rake < -95) {
+                    mechanism = 'Oblique normal (left-lateral component)';
+                } else {
+                    mechanism = 'Oblique normal (right-lateral component)';
+                }
+            }
+            
+            mechanismDiv.textContent = mechanism;
+        }
+        
+        // Calculate realistic magnitude range based on fault area (Wells & Coppersmith 1994)
+        function calculateMagnitudeRange(area) {
+            // area in km^2
+            // For all fault types: log(A) = Mw - 3.98 ± 0.24
+            // Solving for Mw: Mw = log10(A) + 3.98
+            const logArea = Math.log10(area);
+            const meanMw = logArea + 3.98;
+            const minMw = Math.max(5.0, meanMw - 0.5); // ±0.5 around mean, but minimum 5.0
+            const maxMw = Math.min(9.0, meanMw + 0.5); // maximum 9.0
+            const suggestedMw = Math.round(meanMw * 10) / 10; // round to 1 decimal
+            
+            return { min: minMw, max: maxMw, suggested: suggestedMw };
+        }
+        
+        // Confirm geometry and show rupture parameters
+        function confirmGeometry() {
+            // Calculate realistic magnitude based on area
+            const area = faultData.length * faultData.width; // km^2
+            const magRange = calculateMagnitudeRange(area);
+            
+            // Set suggested magnitude value but don't restrict range
+            const magSlider = document.getElementById('magnitude');
+            const magInput = document.getElementById('magnitude-val');
+            magSlider.value = magRange.suggested.toFixed(1);
+            magInput.value = magRange.suggested.toFixed(1);
+            
+            // Update label to show suggested magnitude
+            const magLabel = document.getElementById('magnitude-label');
+            if (magLabel) {
+                magLabel.innerHTML = `Event Magnitude (Mw) <span class="text-xs text-gray-500">(suggested: ${magRange.suggested.toFixed(1)})</span>`;
+            }
+            
+            // Show info about suggested magnitude
+            const magInfo = document.getElementById('magnitude-info');
+            if (magInfo) {
+                magInfo.textContent = `Suggested Mw ${magRange.suggested.toFixed(1)} based on fault area ${area.toFixed(0)} km² (Wells & Coppersmith 1994)`;
+                magInfo.classList.remove('hidden');
+            }
+            
+            // Slide panels
+            document.getElementById('geometry-panel').style.transform = 'translateX(-100%)';
+            document.getElementById('kinematics-panel').style.transform = 'translateX(0)';
+            
+            // Hide confirm geometry button and show back button
+            document.getElementById('confirm-geometry-btn').classList.add('hidden');
+            document.getElementById('back-to-geometry-btn').classList.remove('hidden');
+            document.getElementById('compute-kinematics-btn').classList.remove('hidden');
+            
+            // Hide geometry tab in kinematics mode
+            document.getElementById('tab-geometry').classList.add('hidden');
+            
+            // Show kinematics controls at top
+            document.getElementById('kinematics-controls').classList.remove('hidden');
+            
+            // Clear visualization
+            document.getElementById('plot-container').innerHTML = '<div class="flex items-center justify-center h-full text-gray-400"><div class="text-center"><i class="fas fa-calculator text-6xl mb-4"></i><p class="text-lg">Click Compute Kinematics to generate fault model</p></div></div>';
+        }
+        
+        // Compute kinematics with current parameters
+        function computeKinematics() {
+            // Clear any placeholder message
+            document.getElementById('plot-container').innerHTML = '';
+            
+            // Generate fault with full parameters
+            generateFault();
+            
+            // Update progress to step 2
+            updateProgressSteps(2);
+            
+            // Update computed summary display
+            if (faultData) {
+                document.getElementById('avg-slip-display').textContent = faultData.averageSlip.toFixed(3);
+                document.getElementById('total-moment-display').textContent = faultData.totalMoment.toExponential(2);
+                document.getElementById('computed-mw-display').textContent = faultData.computedMw.toFixed(2);
+                document.getElementById('computed-summary').classList.remove('hidden');
+            }
+            
+            // Show visualization selector and tabs
+            document.getElementById('kinematics-viz-selector').classList.remove('hidden');
+            
+            // Show Subsources button
+            document.getElementById('proceed-subsources-btn').classList.remove('hidden');
+            
+            // Get selected visualization type
+            const vizType = document.getElementById('kinematics-viz-type').value;
+            updateKinematicsVisualization();
+        }
+        
+        // Proceed to Subsources
+        function proceedToSubsources() {
+            // Slide panels
+            document.getElementById('kinematics-panel').style.transform = 'translateX(-100%)';
+            document.getElementById('subsources-panel').style.transform = 'translateX(0)';
+            
+            // Hide Subsources button and Compute Kinematics button
+            document.getElementById('proceed-subsources-btn').classList.add('hidden');
+            document.getElementById('compute-kinematics-btn').classList.add('hidden');
+            
+            // Show Spatial Setup button
+            document.getElementById('proceed-network-btn').classList.remove('hidden');
+            
+            // Hide kinematics controls
+            document.getElementById('kinematics-controls').classList.add('hidden');
+            
+            // Update back button text
+            document.getElementById('back-button-text').textContent = 'Back to Kinematics';
+            
+            // Update progress to step 3
+            updateProgressSteps(3);
+            
+            // Initialize subsources display and calculate grouping
+            updateSubsourceGrouping();
+            
+            // Visualize subsources
+            visualizeSubsources();
+        }
+        
+        // Calculate maximum seismic moment for a patch based on stress-drop limit
+        function maxPatchMoment(areaM2, deltaSigmaMax) {
+            // Maximum seismic moment (N·m) for a patch with stress-drop limit
+            // M0_max = (16/7) * (Δσ_max / √π) * A^1.5
+            return (16.0 / 7.0) * (deltaSigmaMax / Math.sqrt(Math.PI)) * Math.pow(areaM2, 1.5);
+        }
+        
+        // Get stress drop limit based on rake (fault mechanism)
+        function getStressDropLimit(rake) {
+            // Determine fault type from rake
+            const isReverse = rake > 45 && rake < 135;
+            
+            // Reverse/thrust: 4 MPa, Normal/strike-slip: 3 MPa
+            // Convert MPa to Pa
+            return isReverse ? 4e6 : 3e6;
+        }
+        
+        // Convert magnitude to moment (N·m)
+        function magnitude2moment(magnitude) {
+            // Mw = (2/3) × log10(M0) - 6.07
+            // M0 = 10^(1.5 × (Mw + 6.07))
+            return Math.pow(10, 1.5 * (magnitude + 6.07));
+        }
+        
+        // Convert moment to magnitude
+        function moment2magnitude(moment) {
+            // Mw = (2/3) × log10(M0) - 6.07
+            return (2/3) * Math.log10(moment) - 6.07;
+        }
+        
+        // Update subsource grouping based on target magnitude
+        function updateSubsourceGrouping() {
+            if (!faultData) return;
+            
+            const subsourceMag = parseFloat(document.getElementById('subsource-magnitude').value);
+            document.getElementById('subsource-mag-value').textContent = subsourceMag.toFixed(1);
+            
+            // Target moment for each subsource
+            const momentThreshold = magnitude2moment(subsourceMag);
+            
+            // Compute groups
+            const groups = computeSubsourceGroups(momentThreshold);
+            
+            // Calculate actual magnitude for each group
+            const patchLength = faultData.length / faultData.nAlong;
+            const patchWidth = faultData.width / faultData.nDown;
+            const patchArea = patchLength * patchWidth * 1e6; // m²
+            const mu = 3e10; // Pa (shear modulus)
+            
+            const groupMagnitudes = groups.map(group => {
+                let totalMoment = 0;
+                group.forEach(([i, j]) => {
+                    const patch = faultData.patches.find(p => p.alongIdx === i && p.downIdx === j);
+                    if (patch) {
+                        totalMoment += mu * patchArea * patch.slip;
+                    }
+                });
+                return moment2magnitude(totalMoment);
+            });
+            
+            // Update display
+            const totalPatches = faultData.nAlong * faultData.nDown;
+            document.getElementById('total-patches').textContent = totalPatches;
+            document.getElementById('selected-patches').textContent = groups.length;
+            
+            const avgPatchesPerSubsource = totalPatches / groups.length;
+            document.getElementById('subsource-coverage').textContent = avgPatchesPerSubsource.toFixed(1);
+            
+            // Update visualization and histogram
+            visualizeSubsources();
+            plotMagnitudeHistogram(groupMagnitudes);
+        }
+        
+        // Plot histogram of subsource magnitudes
+        function plotMagnitudeHistogram(magnitudes) {
+            const trace = {
+                x: magnitudes,
+                type: 'histogram',
+                marker: {
+                    color: 'rgba(59, 130, 246, 0.7)',
+                    line: {
+                        color: 'rgba(59, 130, 246, 1)',
+                        width: 1
+                    }
+                },
+                xbins: {
+                    size: 0.1
+                }
+            };
+            
+            const layout = {
+                title: {
+                    text: `Distribution of ${magnitudes.length} Subsource Magnitudes`,
+                    font: { size: 12 }
+                },
+                xaxis: {
+                    title: 'Magnitude',
+                    showgrid: true
+                },
+                yaxis: {
+                    title: 'Count',
+                    showgrid: true
+                },
+                margin: {l: 50, r: 20, t: 40, b: 40},
+                bargap: 0.05,
+                showlegend: false
+            };
+            
+            Plotly.newPlot('magnitude-histogram', [trace], layout, {responsive: true});
+        }
+        
+        // Visualize subsources (2D fault plane)
+        function visualizeSubsources() {
+            if (!faultData) return;
+            
+            // Create 2D grid for fault patches with actual dimensions in km
+            const patchLength = faultData.length / faultData.nAlong;
+            const patchWidth = faultData.width / faultData.nDown;
+            
+            // Create moment values for each patch (same calculation as kinematics view)
+            const area = patchLength * patchWidth * 1e6; // m²
+            const mu = 3e10; // Pa (shear modulus)
+            
+            // Create 2D grid for heatmap (rows are down-dip, columns are along-strike)
+            // Extract slip from patches and calculate moment
+            const momentGrid = [];
+            let minMoment = Infinity;
+            let maxMoment = -Infinity;
+            
+            for (let j = 0; j < faultData.nDown; j++) {
+                const row = [];
+                for (let i = 0; i < faultData.nAlong; i++) {
+                    // Find the patch with these indices
+                    const patch = faultData.patches.find(p => p.alongIdx === i && p.downIdx === j);
+                    const slip = patch ? patch.slip : 0;
+                    const moment = mu * area * slip; // N·m
+                    row.push(moment);
+                    
+                    minMoment = Math.min(minMoment, moment);
+                    maxMoment = Math.max(maxMoment, moment);
+                }
+                momentGrid.push(row);
+            }
+            
+            // Compute subsource grouping for visualization
+            const subsourceMag = parseFloat(document.getElementById('subsource-magnitude').value);
+            const momentThreshold = magnitude2moment(subsourceMag);
+            const groups = computeSubsourceGroups(momentThreshold);
+            
+            // Create heatmap trace with Jet colorscale (matching kinematics view)
+            // Note: heatmap treats first index as column (x) and second as row (y)
+            // We need to provide explicit x and y arrays for proper alignment
+            const xEdges = [];
+            const yEdges = [];
+            for (let i = 0; i <= faultData.nAlong; i++) {
+                xEdges.push(i * patchLength);
+            }
+            for (let j = 0; j <= faultData.nDown; j++) {
+                yEdges.push(j * patchWidth);
+            }
+            
+            const traces = [{
+                type: 'heatmap',
+                z: momentGrid,
+                x: xEdges,
+                y: yEdges,
+                colorscale: 'Jet',
+                zmin: minMoment,
+                zmax: maxMoment,
+                colorbar: {
+                    title: 'Moment (N·m)',
+                    tickformat: '.2e'
+                },
+                hovertemplate: 'Along-Strike: %{x:.2f} km<br>Down-Dip: %{y:.2f} km<br>Moment: %{z:.2e} N·m<extra></extra>'
+            }];
+            
+            // Add dots at patch centers and lines connecting grouped patches
+            const centroidsX = [];
+            const centroidsY = [];
+            const colors = [];
+            
+            // Generate colors for each group
+            const groupColors = groups.map((_, idx) => 
+                `hsl(${(idx * 360 / groups.length) % 360}, 70%, 50%)`
+            );
+            
+            // Create lines connecting patches in the same group
+            const shapes = [];
+            groups.forEach((group, groupIdx) => {
+                const color = groupColors[groupIdx];
+                
+                // Add centroids for this group
+                group.forEach(([i, j]) => {
+                    // Center of patch: start + (index * spacing) + (spacing / 2)
+                    const cx = i * patchLength + (patchLength / 2);
+                    const cy = j * patchWidth + (patchWidth / 2);
+                    centroidsX.push(cx);
+                    centroidsY.push(cy);
+                    colors.push(color);
+                });
+                
+                // Draw lines between all patches in the group
+                for (let k = 0; k < group.length - 1; k++) {
+                    for (let m = k + 1; m < group.length; m++) {
+                        const [i1, j1] = group[k];
+                        const [i2, j2] = group[m];
+                        
+                        const x1 = i1 * patchLength + (patchLength / 2);
+                        const y1 = j1 * patchWidth + (patchWidth / 2);
+                        const x2 = i2 * patchLength + (patchLength / 2);
+                        const y2 = j2 * patchWidth + (patchWidth / 2);
+                        
+                        shapes.push({
+                            type: 'line',
+                            x0: x1,
+                            y0: y1,
+                            x1: x2,
+                            y1: y2,
+                            line: {
+                                color: color,
+                                width: 2,
+                                opacity: 0.6
+                            }
+                        });
+                    }
+                }
+            });
+            
+            // Add scatter trace for patch centroids
+            traces.push({
+                type: 'scatter',
+                x: centroidsX,
+                y: centroidsY,
+                mode: 'markers',
+                marker: {
+                    size: 10,
+                    color: colors,
+                    symbol: 'circle',
+                    line: {
+                        color: 'white',
+                        width: 2
+                    }
+                },
+                hoverinfo: 'skip',
+                showlegend: false,
+                xaxis: 'x',
+                yaxis: 'y'
+            });
+            
+            const layout = {
+                title: 'Fault Subsources - 2D View (Grouped by Moment)',
+                xaxis: {
+                    title: 'Along-Strike Distance (km)',
+                    showgrid: true,
+                    zeroline: false
+                },
+                yaxis: {
+                    title: 'Down-Dip Distance (km)',
+                    showgrid: true,
+                    zeroline: false,
+                    scaleanchor: 'x',
+                    autorange: 'reversed'
+                },
+                shapes: shapes,
+                height: 600,
+                margin: {l: 80, r: 120, t: 60, b: 60},
+                plot_bgcolor: '#f5f5f5'
+            };
+            
+            Plotly.newPlot('plot-container', traces, layout);
+        }
+        
+        // Compute subsource groups (returns array of groups, each group is array of [i,j] patch indices)
+        function computeSubsourceGroups(momentThreshold) {
+            if (!faultData) return [];
+            
+            const patchLength = faultData.length / faultData.nAlong;
+            const patchWidth = faultData.width / faultData.nDown;
+            const patchArea = patchLength * patchWidth * 1e6; // m²
+            const mu = 3e10; // Pa (shear modulus)
+            
+            // Helper function to get patch moment
+            function getPatchMoment(i, j) {
+                const patch = faultData.patches.find(p => p.alongIdx === i && p.downIdx === j);
+                return patch ? mu * patchArea * patch.slip : 0;
+            }
+            
+            // Helper function to get neighbors (4-connected)
+            function getNeighbors(i, j) {
+                const neighbors = [];
+                if (i > 0) neighbors.push([i - 1, j]); // left
+                if (i < faultData.nAlong - 1) neighbors.push([i + 1, j]); // right
+                if (j > 0) neighbors.push([i, j - 1]); // up
+                if (j < faultData.nDown - 1) neighbors.push([i, j + 1]); // down
+                return neighbors;
+            }
+            
+            const visited = Array(faultData.nDown).fill(null).map(() => Array(faultData.nAlong).fill(false));
+            const groups = [];
+            
+            // Iterate through all patches
+            for (let j = 0; j < faultData.nDown; j++) {
+                for (let i = 0; i < faultData.nAlong; i++) {
+                    if (visited[j][i]) continue;
+                    
+                    // Start a new subsource group
+                    let groupMoment = getPatchMoment(i, j);
+                    visited[j][i] = true;
+                    const currentGroup = [[i, j]];
+                    
+                    // If this patch already meets threshold, it's its own subsource
+                    if (groupMoment >= momentThreshold) {
+                        groups.push(currentGroup);
+                        continue;
+                    }
+                    
+                    // Otherwise, search for neighbors to group with
+                    const queue = [[i, j]];
+                    
+                    while (queue.length > 0 && groupMoment < momentThreshold) {
+                        const [ci, cj] = queue.shift();
+                        const neighbors = getNeighbors(ci, cj);
+                        
+                        // Sort neighbors by moment (highest first) to prioritize high-slip patches
+                        neighbors.sort((a, b) => {
+                            const momentA = visited[a[1]][a[0]] ? 0 : getPatchMoment(a[0], a[1]);
+                            const momentB = visited[b[1]][b[0]] ? 0 : getPatchMoment(b[0], b[1]);
+                            return momentB - momentA;
+                        });
+                        
+                        for (const [ni, nj] of neighbors) {
+                            if (visited[nj][ni]) continue;
+                            
+                            const neighborMoment = getPatchMoment(ni, nj);
+                            groupMoment += neighborMoment;
+                            visited[nj][ni] = true;
+                            currentGroup.push([ni, nj]);
+                            queue.push([ni, nj]);
+                            
+                            // Stop if we've reached threshold
+                            if (groupMoment >= momentThreshold) {
+                                break;
+                            }
+                        }
+                    }
+                    
+                    groups.push(currentGroup);
+                }
+            }
+            
+            return groups;
+        }
+        
+        // Proceed to Spatial Setup
+        function proceedToSpatialSetup() {
+            // Slide panels
+            document.getElementById('subsources-panel').style.transform = 'translateX(-100%)';
+            document.getElementById('spatial-panel').style.transform = 'translateX(0)';
+            
+            // Hide Spatial Setup button
+            document.getElementById('proceed-network-btn').classList.add('hidden');
+            
+            // Update back button text
+            document.getElementById('back-button-text').textContent = 'Back to Subsources';
+            
+            // Update progress to step 4
+            updateProgressSteps(4);
+            
+            // Show map visualization
+            visualizeMap();
+        }
+        
+        // Update map with station markers
+        function updateMapWithStations(stations) {
+            console.log('updateMapWithStations called with', stations.length, 'stations');
+            
+            // Add station markers to the existing map
+            if (!stations || stations.length === 0) {
+                console.log('No stations to display');
+                return;
+            }
+
+            // Extract station coordinates
+            const stationLats = stations.map(s => s.lat);
+            const stationLons = stations.map(s => s.lon);
+            const stationNames = stations.map(s => s.name);
+            
+            console.log('Station lats:', stationLats.slice(0, 3));
+            console.log('Station lons:', stationLons.slice(0, 3));
+            
+            // Create hover text with station details
+            const hoverText = stations.map(s => {
+                let text = `${s.name}<br>Lat: ${s.lat.toFixed(4)}°<br>Lon: ${s.lon.toFixed(4)}°`;
+                if (s.distance !== undefined) {
+                    text += `<br>Distance: ${s.distance} km`;
+                }
+                return text;
+            });
+
+            // Station trace
+            const stationTrace = {
+                type: 'scattermapbox',
+                mode: 'markers',
+                lon: stationLons,
+                lat: stationLats,
+                marker: {
+                    size: 12,
+                    color: '#00FFFF',
+                    opacity: 1
+                },
+                hovertext: hoverText,
+                hoverinfo: 'text',
+                name: '▲ Stations',
+                showlegend: true
+            };
+
+            console.log('Station trace created:', stationTrace);
+
+            // Station text overlays
+            const stationTextTrace = {
+                type: 'scattermapbox',
+                mode: 'text',
+                lon: stationLons,
+                lat: stationLats,
+                text: stationNames.map(() => '▲'),
+                textfont: {
+                    size: 10,
+                    color: '#0066CC'
+                },
+                hoverinfo: 'skip',
+                showlegend: false
+            };
+
+            // Get current plot data
+            const plotDiv = document.getElementById('plot-container');
+            console.log('plotDiv:', plotDiv);
+            console.log('plotDiv.data:', plotDiv.data);
+            
+            // Check if plotDiv has a data property (plot exists)
+            if (plotDiv && plotDiv.data && plotDiv.data.length > 0) {
+                console.log('Current plot has', plotDiv.data.length, 'traces');
+                
+                // Remove existing station traces if they exist (indices 2 and 3)
+                if (plotDiv.data.length > 2) {
+                    console.log('Deleting existing station traces');
+                    Plotly.deleteTraces('plot-container', [2, 3]);
+                }
+                
+                // Add new station traces
+                console.log('Adding new station traces');
+                Plotly.addTraces('plot-container', [stationTrace, stationTextTrace]);
+            } else {
+                console.error('Map not initialized. Call visualizeMap() first.');
+                console.error('plotDiv exists:', !!plotDiv);
+                console.error('plotDiv.data exists:', plotDiv && !!plotDiv.data);
+            }
+        }
+        
+        // Visualize map with fault and stations
+        function visualizeMap() {
+            const hypoLat = parseFloat(document.getElementById('hypo-lat').value);
+            const hypoLon = parseFloat(document.getElementById('hypo-lon').value);
+            const strike = parseFloat(document.getElementById('strike').value);
+            const length = faultData.length;
+            const width = faultData.width;
+            const dip = faultData.dip;
+            
+            // Calculate fault trace on surface
+            const strikeRad = strike * Math.PI / 180;
+            
+            // Fault endpoints along strike
+            const halfLength = length / 2;
+            const deltaLat1 = (halfLength * Math.cos(strikeRad)) / 111.0;
+            const deltaLon1 = (halfLength * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
+            
+            const faultStart = {
+                lat: hypoLat - deltaLat1,
+                lon: hypoLon - deltaLon1
+            };
+            const faultEnd = {
+                lat: hypoLat + deltaLat1,
+                lon: hypoLon + deltaLon1
+            };
+            
+            // Create fault trace
+            const faultTrace = {
+                type: 'scattermapbox',
+                mode: 'lines+markers',
+                lon: [faultStart.lon, faultEnd.lon],
+                lat: [faultStart.lat, faultEnd.lat],
+                marker: {
+                    size: 10,
+                    color: 'red'
+                },
+                line: {
+                    color: 'red',
+                    width: 4
+                },
+                name: 'Fault',
+                hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
+                showlegend: true
+            };
+            
+            // Add hypocenter marker - large bright yellow circle
+            const hypocenter = {
+                type: 'scattermapbox',
+                mode: 'markers',
+                lon: [hypoLon],
+                lat: [hypoLat],
+                marker: {
+                    size: 18,
+                    color: '#FFD700',
+                    opacity: 1
+                },
+                name: '⭐ Hypocenter',
+                hovertemplate: 'Hypocenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
+                showlegend: true
+            };
+            
+            const data = [faultTrace, hypocenter];
+            
+            const layout = {
+                mapbox: {
+                    style: 'open-street-map',
+                    center: {
+                        lat: hypoLat,
+                        lon: hypoLon
+                    },
+                    zoom: 8
+                },
+                title: 'Fault Location Map',
+                showlegend: true,
+                height: 750,
+                margin: {l: 0, r: 0, t: 40, b: 0}
+            };
+            
+            Plotly.newPlot('plot-container', data, layout);
+        }
+        
+        // Generate random station network
+        function generateRandomStations() {
+            console.log('generateRandomStations called');
+            
+            const numStations = parseInt(document.getElementById('num-stations').value);
+            const maxDistance = parseFloat(document.getElementById('max-distance').value);
+            const hypoLat = parseFloat(document.getElementById('hypo-lat').value);
+            const hypoLon = parseFloat(document.getElementById('hypo-lon').value);
+            
+            console.log('Parameters:', { numStations, maxDistance, hypoLat, hypoLon });
+            
+            // Generate random stations in a circular area
+            const stations = [];
+            for (let i = 0; i < numStations; i++) {
+                const angle = Math.random() * 2 * Math.PI;
+                const distance = Math.sqrt(Math.random()) * maxDistance;
+                
+                // Convert distance/bearing to lat/lon (approximate)
+                const deltaLat = (distance * Math.cos(angle)) / 111.0;
+                const deltaLon = (distance * Math.sin(angle)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
+                
+                stations.push({
+                    name: `ST${String(i + 1).padStart(3, '0')}`,
+                    lat: hypoLat + deltaLat,
+                    lon: hypoLon + deltaLon,
+                    distance: parseFloat(distance.toFixed(1))
+                });
+            }
+            
+            console.log('Generated', stations.length, 'stations');
+            displayStations(stations);
+            updateMapWithStations(stations);
+        }
+        
+        // Load station file
+        function loadStationFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.txt,.csv,.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        // Try parsing as JSON first
+                        const stations = JSON.parse(event.target.result);
+                        displayStations(stations);
+                        updateMapWithStations(stations);
+                    } catch (err) {
+                        // Parse as CSV with header
+                        const lines = event.target.result.split('\n').filter(line => line.trim());
+                        const stations = [];
+                        
+                        if (lines.length > 0) {
+                            // Check if first line is a header (contains column names)
+                            const firstLine = lines[0].toLowerCase();
+                            const hasHeader = firstLine.includes('station') || 
+                                            firstLine.includes('latitude') || 
+                                            firstLine.includes('longitude') ||
+                                            firstLine.includes('network');
+                            
+                            const startIdx = hasHeader ? 1 : 0;
+                            
+                            for (let i = startIdx; i < lines.length; i++) {
+                                const line = lines[i].trim();
+                                if (!line) continue;
+                                
+                                const parts = line.split(',').map(p => p.trim());
+                                
+                                if (parts.length >= 4) {
+                                    // Format: station_code,network,latitude,longitude,vs30,distance,elevation
+                                    const stationCode = parts[0];
+                                    const network = parts[1];
+                                    const lat = parseFloat(parts[2]);
+                                    const lon = parseFloat(parts[3]);
+                                    const vs30 = parts[4] ? parseFloat(parts[4]) : null;
+                                    const distance = parts[5] ? parseFloat(parts[5]) : null;
+                                    const elevation = parts[6] ? parseFloat(parts[6]) : null;
+                                    
+                                    if (!isNaN(lat) && !isNaN(lon)) {
+                                        stations.push({
+                                            name: `${network}.${stationCode}`,
+                                            lat: lat,
+                                            lon: lon,
+                                            vs30: vs30,
+                                            distance: distance,
+                                            elevation: elevation,
+                                            station_code: stationCode,
+                                            network: network
+                                        });
+                                    }
+                                } else if (parts.length >= 3) {
+                                    // Simple format: name,lat,lon
+                                    const name = parts[0];
+                                    const lat = parseFloat(parts[1]);
+                                    const lon = parseFloat(parts[2]);
+                                    
+                                    if (!isNaN(lat) && !isNaN(lon)) {
+                                        stations.push({
+                                            name: name,
+                                            lat: lat,
+                                            lon: lon
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (stations.length > 0) {
+                            displayStations(stations);
+                            updateMapWithStations(stations);
+                        } else {
+                            alert('No valid stations found in file. Expected format:\nstation_code,network,latitude,longitude,vs30,distance,elevation');
+                        }
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+        
+        // Display stations in list
+        function displayStations(stations) {
+            const stationList = document.getElementById('station-list');
+            const stationCount = document.getElementById('station-count');
+            const stationItems = document.getElementById('station-items');
+            
+            stationCount.textContent = stations.length;
+            stationItems.innerHTML = '';
+            
+            for (const station of stations) {
+                const item = document.createElement('div');
+                item.className = 'py-1 text-sm';
+                
+                // Build display text
+                let displayText = `${station.name}: ${station.lat.toFixed(4)}°, ${station.lon.toFixed(4)}°`;
+                
+                // Add additional metadata if available
+                const metadata = [];
+                if (station.vs30 !== null && station.vs30 !== undefined) {
+                    metadata.push(`Vs30: ${station.vs30.toFixed(1)} m/s`);
+                }
+                if (station.distance !== null && station.distance !== undefined) {
+                    metadata.push(`Dist: ${station.distance.toFixed(1)} km`);
+                }
+                if (station.elevation !== null && station.elevation !== undefined) {
+                    metadata.push(`Elev: ${station.elevation.toFixed(0)} m`);
+                }
+                
+                if (metadata.length > 0) {
+                    displayText += ` | ${metadata.join(', ')}`;
+                }
+                
+                item.textContent = displayText;
+                stationItems.appendChild(item);
+            }
+            
+            stationList.classList.remove('hidden');
+        }
+        
+        // Update visualization based on dropdown selection
+        function updateKinematicsVisualization() {
+            const vizType = document.getElementById('kinematics-viz-type').value;
+            
+            if (vizType === 'slip') {
+                visualize('slip');
+            } else if (vizType === 'moment') {
+                visualize('moment');
+            } else if (vizType === 'rupture-time') {
+                visualizeRuptureTime();
+            } else if (vizType === 'stf') {
+                visualizeSTF();
+            }
+        }
+        
+        // Back to geometry panel
+        function backToGeometry() {
+            // Check which panel is currently visible
+            const spatialVisible = document.getElementById('spatial-panel').style.transform === 'translateX(0px)';
+            const subsourcesVisible = document.getElementById('subsources-panel').style.transform === 'translateX(0px)';
+            
+            if (spatialVisible) {
+                // Go back to subsources from spatial
+                document.getElementById('spatial-panel').style.transform = 'translateX(100%)';
+                document.getElementById('subsources-panel').style.transform = 'translateX(0)';
+                
+                // Show subsources button, hide spatial button
+                document.getElementById('proceed-network-btn').classList.remove('hidden');
+                
+                // Update button text
+                document.getElementById('back-button-text').textContent = 'Back to Kinematics';
+                
+                // Visualize subsources
+                visualizeSubsources();
+                
+                // Update progress back to step 3
+                updateProgressSteps(3);
+            } else if (subsourcesVisible) {
+                // Go back to kinematics from subsources
+                document.getElementById('subsources-panel').style.transform = 'translateX(100%)';
+                document.getElementById('kinematics-panel').style.transform = 'translateX(0)';
+                
+                // Show kinematics controls and subsources button
+                document.getElementById('kinematics-controls').classList.remove('hidden');
+                document.getElementById('compute-kinematics-btn').classList.remove('hidden');
+                document.getElementById('proceed-subsources-btn').classList.remove('hidden');
+                
+                // Hide spatial button
+                document.getElementById('proceed-network-btn').classList.add('hidden');
+                
+                // Restore button text
+                document.getElementById('back-button-text').textContent = 'Back to Geometry';
+                
+                // Restore kinematics visualization
+                updateKinematicsVisualization();
+                
+                // Update progress back to step 2
+                updateProgressSteps(2);
+            } else {
+                // Go back to geometry from kinematics
+                document.getElementById('geometry-panel').style.transform = 'translateX(0)';
+                document.getElementById('kinematics-panel').style.transform = 'translateX(100%)';
+                
+                // Show confirm geometry button and hide back button
+                document.getElementById('confirm-geometry-btn').classList.remove('hidden');
+                document.getElementById('back-to-geometry-btn').classList.add('hidden');
+                document.getElementById('compute-kinematics-btn').classList.add('hidden');
+                
+                // Show geometry tab again
+                document.getElementById('tab-geometry').classList.remove('hidden');
+                
+                // Hide kinematics controls
+                document.getElementById('kinematics-controls').classList.add('hidden');
+                
+                // Hide subsources and spatial buttons
+                document.getElementById('proceed-subsources-btn').classList.add('hidden');
+                document.getElementById('proceed-network-btn').classList.add('hidden');
+                
+                // Switch back to geometry visualization
+                switchTab('geometry');
+                previewGeometry();
+                
+                // Update progress back to step 1
+                updateProgressSteps(1);
+            }
+        }
+        
+        // Go back to landing page
+        function goHome() {
+            // Hide workspace, show landing page
+            document.getElementById('landing-page').classList.remove('hidden');
+            document.getElementById('workspace').classList.add('hidden');
+            
+            // Reset panels
+            document.getElementById('geometry-panel').style.transform = 'translateX(0)';
+            document.getElementById('kinematics-panel').style.transform = 'translateX(100%)';
+            document.getElementById('subsources-panel').style.transform = 'translateX(100%)';
+            document.getElementById('spatial-panel').style.transform = 'translateX(100%)';
+            
+            // Hide footer buttons
+            document.getElementById('confirm-geometry-btn').classList.add('hidden');
+            document.getElementById('back-to-geometry-btn').classList.add('hidden');
+            document.getElementById('compute-kinematics-btn').classList.add('hidden');
+            document.getElementById('proceed-subsources-btn').classList.add('hidden');
+            document.getElementById('proceed-network-btn').classList.add('hidden');
+            
+            // Hide kinematics controls
+            document.getElementById('kinematics-controls').classList.add('hidden');
+            
+            // Hide progress steps
+            document.getElementById('progress-steps').classList.add('hidden');
+            
+            currentMode = null;
+        }
+        
+        // Preview geometry before confirmation
+        function previewGeometry() {
+            const length = parseFloat(document.getElementById('length').value);
+            const width = parseFloat(document.getElementById('width').value);
+            const dip = parseFloat(document.getElementById('dip').value);
+            const topDepth = parseFloat(document.getElementById('top-depth').value);
+            const patchSize = parseFloat(document.getElementById('patch-size').value);
+            
+            const nAlong = Math.ceil(length / patchSize);
+            const nDown = Math.ceil(width / patchSize);
+            
+            // Fixed strike at 0 degrees (North)
+            const strikeRad = 0;
+            const dipRad = dip * Math.PI / 180;
+            
+            // Perpendicular direction (strike + 90°)
+            const perpRad = strikeRad + Math.PI / 2;
+            
+            // Generate patch centers with uniform slip for preview
+            const patches = [];
+            for (let i = 0; i < nAlong; i++) {
+                for (let j = 0; j < nDown; j++) {
+                    const alongDist = (i + 0.5) * (length / nAlong);
+                    const downDist = (j + 0.5) * (width / nDown);
+                    
+                    const x = alongDist * Math.cos(strikeRad) + downDist * Math.cos(perpRad) * Math.cos(dipRad);
+                    const y = alongDist * Math.sin(strikeRad) + downDist * Math.sin(perpRad) * Math.cos(dipRad);
+                    const z = topDepth + downDist * Math.sin(dipRad);
+                    
+                    patches.push({
+                        x: x,
+                        y: y,
+                        z: z,
+                        slip: 1.0,  // Uniform slip for preview
+                        alongIdx: i,
+                        downIdx: j
+                    });
+                }
+            }
+            
+            // Create polygon corners for visualization
+            const corners = [
+                {x: 0, y: 0, z: topDepth},
+                {x: length * Math.cos(strikeRad), y: length * Math.sin(strikeRad), z: topDepth},
+                {
+                    x: length * Math.cos(strikeRad) + width * Math.cos(perpRad) * Math.cos(dipRad),
+                    y: length * Math.sin(strikeRad) + width * Math.sin(perpRad) * Math.cos(dipRad),
+                    z: topDepth + width * Math.sin(dipRad)
+                },
+                {
+                    x: width * Math.cos(perpRad) * Math.cos(dipRad),
+                    y: width * Math.sin(perpRad) * Math.cos(dipRad),
+                    z: topDepth + width * Math.sin(dipRad)
+                }
+            ];
+            
+            faultData = {
+                length: length,
+                width: width,
+                dip: dip,
+                topDepth: topDepth,
+                patchSize: patchSize,
+                nAlong: nAlong,
+                nDown: nDown,
+                patches: patches,
+                corners: corners,
+                hypoAlong: 0.5,
+                hypoDown: 0.5
+            };
+            
+            switchTab('geometry');
+            visualize('geometry');
+        }
+
+        // Generate synthetic fault with full parameters
+        function generateFault() {
+            const length = parseFloat(document.getElementById('length').value);
+            const width = parseFloat(document.getElementById('width').value);
+            const dip = parseFloat(document.getElementById('dip').value);
+            const topDepth = parseFloat(document.getElementById('top-depth').value);
+            const patchSize = parseFloat(document.getElementById('patch-size').value);
+            const rake = parseFloat(document.getElementById('rake').value);
+            const magnitude = parseFloat(document.getElementById('magnitude').value);
+            const slipDist = document.getElementById('slip-dist').value;
+            const hypoAlong = parseFloat(document.getElementById('hypo-along').value);
+            const hypoDown = parseFloat(document.getElementById('hypo-down').value);
+            const ruptureVel = parseFloat(document.getElementById('rupture-vel').value);
+            
+            const nAlong = Math.ceil(length / patchSize);
+            const nDown = Math.ceil(width / patchSize);
+            
+            // Fixed strike at 0 degrees (North)
+            const strikeRad = 0;
+            const dipRad = dip * Math.PI / 180;
+            
+            // Perpendicular direction (strike + 90°)
+            const perpRad = strikeRad + Math.PI / 2;
+            
+            // Calculate fault area
+            const area = length * width; // km^2
+            
+            // Generate slip distribution with physical constraints
+            const slipValues = generateSlipDistribution(slipDist, nAlong, nDown, magnitude, area, hypoAlong, hypoDown, rake);
+            
+            // Generate patch centers
+            const patches = [];
+            let idx = 0;
+            for (let i = 0; i < nAlong; i++) {
+                for (let j = 0; j < nDown; j++) {
+                    const alongDist = (i + 0.5) * (length / nAlong);
+                    const downDist = (j + 0.5) * (width / nDown);
+                    
+                    const x = alongDist * Math.cos(strikeRad) + downDist * Math.cos(perpRad) * Math.cos(dipRad);
+                    const y = alongDist * Math.sin(strikeRad) + downDist * Math.sin(perpRad) * Math.cos(dipRad);
+                    const z = topDepth + downDist * Math.sin(dipRad);
+                    
+                    patches.push({
+                        x: x,
+                        y: y,
+                        z: z,
+                        slip: slipValues[idx],
+                        alongIdx: i,
+                        downIdx: j
+                    });
+                    idx++;
+                }
+            }
+            
+            // Create polygon corners for visualization
+            const corners = [
+                {x: 0, y: 0, z: topDepth},
+                {x: length * Math.cos(strikeRad), y: length * Math.sin(strikeRad), z: topDepth},
+                {
+                    x: length * Math.cos(strikeRad) + width * Math.cos(perpRad) * Math.cos(dipRad),
+                    y: length * Math.sin(strikeRad) + width * Math.sin(perpRad) * Math.cos(dipRad),
+                    z: topDepth + width * Math.sin(dipRad)
+                },
+                {
+                    x: width * Math.cos(perpRad) * Math.cos(dipRad),
+                    y: width * Math.sin(perpRad) * Math.cos(dipRad),
+                    z: topDepth + width * Math.sin(dipRad)
+                }
+            ];
+            
+            faultData = {
+                length: length,
+                width: width,
+                dip: dip,
+                topDepth: topDepth,
+                patchSize: patchSize,
+                rake: rake,
+                magnitude: magnitude,
+                slipDist: slipDist,
+                hypoAlong: hypoAlong,
+                hypoDown: hypoDown,
+                ruptureVel: ruptureVel,
+                nAlong: nAlong,
+                nDown: nDown,
+                patches: patches,
+                corners: corners
+            };
+            
+            // Calculate actual seismic moment from patches
+            const patchArea = (length / nAlong) * (width / nDown) * 1e6; // m²
+            const mu = 3e10; // Pa
+            const totalMoment = patches.reduce((sum, p) => sum + mu * patchArea * p.slip, 0);
+            const computedMw = (2/3) * Math.log10(totalMoment) - 6.07;
+            
+            // Store computed values
+            faultData.totalMoment = totalMoment;
+            faultData.computedMw = computedMw;
+            faultData.averageSlip = patches.reduce((sum, p) => sum + p.slip, 0) / patches.length;
+            
+            visualize(currentTab);
+        }
+
+        // Generate slip distribution with physical constraints and rake-dependent patterns
+        function generateSlipDistribution(type, nAlong, nDown, magnitude, area, hypoAlong, hypoDown, rake) {
+            // Calculate average slip from seismic moment
+            // M0 = μ × A × D, where μ = 3×10^10 Pa (shear modulus)
+            // Mw = (2/3) × log10(M0) - 6.07, M0 in N·m
+            // Solving: M0 = 10^(1.5 × (Mw + 6.07))
+            const M0 = Math.pow(10, 1.5 * (magnitude + 6.07)); // N·m
+            const mu = 3e10; // Pa (30 GPa)
+            const areaM2 = area * 1e6; // convert km^2 to m^2
+            const averageSlip = M0 / (mu * areaM2); // meters
+            const maxSlip = averageSlip * 2.0; // Peak slip is ~2x average
+            
+            // Hypocenter location in patch indices
+            const hypoI = Math.floor(hypoAlong * nAlong);
+            const hypoJ = Math.floor(hypoDown * nDown);
+            
+            // Determine fault type from rake
+            const isStrikeSlip = (rake >= -45 && rake <= 45) || rake >= 135 || rake <= -135;
+            const isReverse = rake > 45 && rake < 135;
+            const isNormal = rake > -135 && rake < -45;
+            
+            // Rake-dependent distance calculation
+            function calcRakeDist(di, dj) {
+                if (isStrikeSlip) {
+                    // Strike-slip: rupture propagates along strike, limited down-dip
+                    return Math.sqrt((di * 0.6) ** 2 + (dj * 1.8) ** 2);
+                } else if (isReverse) {
+                    // Reverse/thrust: biased updip (negative dj)
+                    const weight = dj < 0 ? 0.6 : 2.0;
+                    return Math.sqrt((di * 1.0) ** 2 + (dj * weight) ** 2);
+                } else if (isNormal) {
+                    // Normal: biased downdip (positive dj)
+                    const weight = dj > 0 ? 0.6 : 2.0;
+                    return Math.sqrt((di * 1.0) ** 2 + (dj * weight) ** 2);
+                } else {
+                    return Math.sqrt(di ** 2 + dj ** 2);
+                }
+            }
+            
+            const total = nAlong * nDown;
+            const slips = [];
+            
+            for (let i = 0; i < nAlong; i++) {
+                for (let j = 0; j < nDown; j++) {
+                    const di = (i - hypoI) / nAlong;
+                    const dj = (j - hypoJ) / nDown;
+                    let slip;
+                    
+                    if (type === 'uniform') {
+                        // Uniform with small perturbations
+                        slip = averageSlip * (0.9 + Math.random() * 0.2);
+                        
+                    } else if (type === 'random') {
+                        // Random with rake-dependent envelope
+                        const dist = calcRakeDist(di, dj);
+                        const envelope = Math.exp(-dist / 0.4);
+                        slip = maxSlip * Math.random() * (0.3 + 0.7 * envelope);
+                        
+                    } else if (type === 'gaussian') {
+                        // Gaussian with rake-dependent distance
+                        const dist = calcRakeDist(di, dj);
+                        slip = maxSlip * Math.exp(-dist / 0.25) * (0.8 + Math.random() * 0.4);
+                        
+                    } else if (type === 'asperity') {
+                        // Asperity positions depend on rake
+                        let asp1_i, asp1_j, asp2_i, asp2_j, asp3_i, asp3_j;
+                        
+                        if (isStrikeSlip) {
+                            // Asperities spread along strike relative to hypocenter
+                            asp1_i = -0.2; asp1_j = 0.0;
+                            asp2_i = 0.1;  asp2_j = 0.0;
+                            asp3_i = 0.3;  asp3_j = 0.0;
+                        } else if (isReverse) {
+                            // Asperities favor updip from hypocenter
+                            asp1_i = 0.0;  asp1_j = -0.2;
+                            asp2_i = 0.1;  asp2_j = -0.1;
+                            asp3_i = -0.1; asp3_j = -0.15;
+                        } else if (isNormal) {
+                            // Asperities favor downdip from hypocenter
+                            asp1_i = 0.0;  asp1_j = 0.2;
+                            asp2_i = 0.1;  asp2_j = 0.15;
+                            asp3_i = -0.1; asp3_j = 0.1;
+                        } else {
+                            // Generic distribution around hypocenter
+                            asp1_i = -0.1; asp1_j = 0.0;
+                            asp2_i = 0.1;  asp2_j = 0.1;
+                            asp3_i = 0.0;  asp3_j = -0.1;
+                        }
+                        
+                        const d1 = Math.sqrt((di - asp1_i) ** 2 + (dj - asp1_j) ** 2);
+                        const d2 = Math.sqrt((di - asp2_i) ** 2 + (dj - asp2_j) ** 2);
+                        const d3 = Math.sqrt((di - asp3_i) ** 2 + (dj - asp3_j) ** 2);
+                        
+                        const s1 = maxSlip * 1.2 * Math.exp(-d1 / 0.15);
+                        const s2 = maxSlip * 0.8 * Math.exp(-d2 / 0.15);
+                        const s3 = maxSlip * 0.6 * Math.exp(-d3 / 0.15);
+                        
+                        slip = Math.max(s1, s2, s3) * (0.8 + Math.random() * 0.4);
+                    }
+                    
+                    slips.push(Math.max(0, slip));
+                }
+            }
+            
+            // Normalize to maintain correct average slip (and thus correct moment)
+            const slipMean = slips.reduce((a, b) => a + b, 0) / total;
+            for (let i = 0; i < slips.length; i++) {
+                slips[i] = (slips[i] / slipMean) * averageSlip;
+            }
+            
+            return slips;
+        }
+
+        // Visualize GeoJSON data
+        function visualizeGeoJSON(type) {
+            const patches = faultData.patches;
+            
+            if (type === 'slip') {
+                // Slip distribution as 3D scatter
+                const trace = {
+                    x: patches.map(p => p.x),
+                    y: patches.map(p => p.y),
+                    z: patches.map(p => p.z),
+                    mode: 'markers',
+                    type: 'scatter3d',
+                    marker: {
+                        size: 8,
+                        color: patches.map(p => p.slip),
+                        colorscale: 'Jet',
+                        showscale: true,
+                        colorbar: {title: 'Slip (m)'}
+                    },
+                    text: patches.map(p => `Slip: ${p.slip.toFixed(2)} m`)
+                };
+                
+                const layout = {
+                    title: 'Slip Distribution',
+                    scene: {
+                        xaxis: {title: 'Longitude'},
+                        yaxis: {title: 'Latitude'},
+                        zaxis: {title: 'Depth (km)', autorange: 'reversed'}
+                    },
+                    margin: {l: 0, r: 0, t: 40, b: 0}
+                };
+                
+                Plotly.newPlot('plot-container', [trace], layout);
+                
+            } else if (type === 'moment') {
+                // Moment release as 3D scatter
+                const trace = {
+                    x: patches.map(p => p.x),
+                    y: patches.map(p => p.y),
+                    z: patches.map(p => p.z),
+                    mode: 'markers',
+                    type: 'scatter3d',
+                    marker: {
+                        size: 8,
+                        color: patches.map(p => p.moment),
+                        colorscale: 'Jet',
+                        showscale: true,
+                        colorbar: {title: 'Moment (N·m)'}
+                    },
+                    text: patches.map(p => `Moment: ${p.moment.toExponential(2)} N·m`)
+                };
+                
+                const layout = {
+                    title: 'Moment Release',
+                    scene: {
+                        xaxis: {title: 'Longitude'},
+                        yaxis: {title: 'Latitude'},
+                        zaxis: {title: 'Depth (km)', autorange: 'reversed'}
+                    },
+                    margin: {l: 0, r: 0, t: 40, b: 0}
+                };
+                
+                Plotly.newPlot('plot-container', [trace], layout);
+                
+            } else if (type === 'rupture') {
+                // Rupture time as 3D scatter
+                const trace = {
+                    x: patches.map(p => p.x),
+                    y: patches.map(p => p.y),
+                    z: patches.map(p => p.z),
+                    mode: 'markers',
+                    type: 'scatter3d',
+                    marker: {
+                        size: 8,
+                        color: patches.map(p => p.rupture_time),
+                        colorscale: 'Viridis',
+                        showscale: true,
+                        colorbar: {title: 'Time (s)'}
+                    },
+                    text: patches.map(p => `Rupture Time: ${p.rupture_time.toFixed(2)} s`)
+                };
+                
+                const layout = {
+                    title: 'Rupture Time',
+                    scene: {
+                        xaxis: {title: 'Longitude'},
+                        yaxis: {title: 'Latitude'},
+                        zaxis: {title: 'Depth (km)', autorange: 'reversed'}
+                    },
+                    margin: {l: 0, r: 0, t: 40, b: 0}
+                };
+                
+                Plotly.newPlot('plot-container', [trace], layout);
+                
+            } else if (type === 'stf') {
+                // Source time function
+                visualizeSTF();
+            }
+        }
+
+        // Visualization
+        function visualize(type) {
+            if (!faultData) return;
+            
+            // Handle GeoJSON visualization differently
+            if (faultData.isGeoJSON) {
+                visualizeGeoJSON(type);
+                return;
+            }
+            
+            const patches = faultData.patches;
+            const corners = faultData.corners;
+            
+            if (type === 'geometry') {
+                // 3D geometry view - show patches as rectangles
+                const patchLength = faultData.length / faultData.nAlong;
+                const patchWidth = faultData.width / faultData.nDown;
+                
+                // Fixed strike at 0 degrees (North)
+                const strikeRad = 0;
+                const dipRad = faultData.dip * Math.PI / 180;
+                const perpRad = strikeRad + Math.PI / 2;
+                
+                // Create mesh traces for each patch
+                const traces = [];
+                
+                for (const patch of patches) {
+                    const i = patch.alongIdx;
+                    const j = patch.downIdx;
+                    
+                    // Calculate 4 corners of this patch
+                    const alongStart = i * patchLength;
+                    const alongEnd = (i + 1) * patchLength;
+                    const downStart = j * patchWidth;
+                    const downEnd = (j + 1) * patchWidth;
+                    
+                    const corners = [
+                        // Bottom-left
+                        {
+                            x: alongStart * Math.cos(strikeRad) + downStart * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongStart * Math.sin(strikeRad) + downStart * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downStart * Math.sin(dipRad)
+                        },
+                        // Bottom-right
+                        {
+                            x: alongEnd * Math.cos(strikeRad) + downStart * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongEnd * Math.sin(strikeRad) + downStart * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downStart * Math.sin(dipRad)
+                        },
+                        // Top-right
+                        {
+                            x: alongEnd * Math.cos(strikeRad) + downEnd * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongEnd * Math.sin(strikeRad) + downEnd * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downEnd * Math.sin(dipRad)
+                        },
+                        // Top-left
+                        {
+                            x: alongStart * Math.cos(strikeRad) + downEnd * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongStart * Math.sin(strikeRad) + downEnd * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downEnd * Math.sin(dipRad)
+                        }
+                    ];
+                    
+                    // Create mesh3d trace for this patch
+                    traces.push({
+                        type: 'mesh3d',
+                        x: corners.map(c => c.x),
+                        y: corners.map(c => c.y),
+                        z: corners.map(c => c.z),
+                        i: [0, 0],
+                        j: [1, 2],
+                        k: [2, 3],
+                        color: 'lightblue',
+                        opacity: 0.8,
+                        flatshading: true,
+                        hovertemplate: 'Patch (' + i + ',' + j + ')<br>X: %{x:.1f} km<br>Y: %{y:.1f} km<br>Depth: %{z:.1f} km<extra></extra>'
+                    });
+                    
+                    // Add outline for this patch
+                    traces.push({
+                        type: 'scatter3d',
+                        x: [...corners.map(c => c.x), corners[0].x],
+                        y: [...corners.map(c => c.y), corners[0].y],
+                        z: [...corners.map(c => c.z), corners[0].z],
+                        mode: 'lines',
+                        line: {
+                            color: 'darkblue',
+                            width: 2
+                        },
+                        hoverinfo: 'skip',
+                        showlegend: false
+                    });
+                }
+                
+                const allX = patches.map(p => p.x);
+                const allY = patches.map(p => p.y);
+                const xExtent = Math.max(...allX) - Math.min(...allX);
+                const yExtent = Math.max(...allY) - Math.min(...allY);
+                const maxExtent = Math.max(xExtent, yExtent);
+                
+                const layout = {
+                    scene: {
+                        xaxis: {title: 'X (km)', range: [Math.min(...allX) - maxExtent*0.1, Math.min(...allX) + maxExtent*1.1]},
+                        yaxis: {title: 'Y (km)', range: [Math.min(...allY) - maxExtent*0.1, Math.min(...allY) + maxExtent*1.1]},
+                        zaxis: {title: 'Depth (km)', range: [100, 0]},
+                        aspectmode: 'manual',
+                        aspectratio: {x: 1, y: 1, z: 0.5}
+                    },
+                    margin: {l: 0, r: 0, t: 30, b: 0},
+                    showlegend: false
+                };
+                
+                Plotly.newPlot('plot-container', traces, layout);
+                
+            } else if (type === 'slip') {
+                // Slip distribution - 3D view with colored patches (no gaps)
+                const patchLength = faultData.length / faultData.nAlong;
+                const patchWidth = faultData.width / faultData.nDown;
+                
+                // Fixed strike at 0 degrees (North)
+                const strikeRad = 0;
+                const dipRad = faultData.dip * Math.PI / 180;
+                const perpRad = strikeRad + Math.PI / 2;
+                
+                // Calculate global min/max slip for color scale
+                const allSlips = patches.map(p => p.slip || 0);
+                const minSlip = Math.min(...allSlips);
+                const maxSlip = Math.max(...allSlips);
+                
+                // Create mesh traces for each patch
+                const traces = [];
+                
+                for (const patch of patches) {
+                    const i = patch.alongIdx;
+                    const j = patch.downIdx;
+                    
+                    // Calculate 4 corners of this patch
+                    const alongStart = i * patchLength;
+                    const alongEnd = (i + 1) * patchLength;
+                    const downStart = j * patchWidth;
+                    const downEnd = (j + 1) * patchWidth;
+                    
+                    const corners = [
+                        // Bottom-left
+                        {
+                            x: alongStart * Math.cos(strikeRad) + downStart * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongStart * Math.sin(strikeRad) + downStart * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downStart * Math.sin(dipRad)
+                        },
+                        // Bottom-right
+                        {
+                            x: alongEnd * Math.cos(strikeRad) + downStart * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongEnd * Math.sin(strikeRad) + downStart * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downStart * Math.sin(dipRad)
+                        },
+                        // Top-right
+                        {
+                            x: alongEnd * Math.cos(strikeRad) + downEnd * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongEnd * Math.sin(strikeRad) + downEnd * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downEnd * Math.sin(dipRad)
+                        },
+                        // Top-left
+                        {
+                            x: alongStart * Math.cos(strikeRad) + downEnd * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongStart * Math.sin(strikeRad) + downEnd * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downEnd * Math.sin(dipRad)
+                        }
+                    ];
+                    
+                    // Create mesh3d trace for this patch with slip color
+                    traces.push({
+                        type: 'mesh3d',
+                        x: corners.map(c => c.x),
+                        y: corners.map(c => c.y),
+                        z: corners.map(c => c.z),
+                        i: [0, 0],
+                        j: [1, 2],
+                        k: [2, 3],
+                        intensity: [patch.slip, patch.slip, patch.slip, patch.slip],
+                        colorscale: 'Viridis',
+                        cmin: minSlip,
+                        cmax: maxSlip,
+                        showscale: i === 0 && j === 0,
+                        colorbar: {
+                            title: 'Slip (m)'
+                        },
+                        flatshading: true,
+                        hovertemplate: 'Slip: ' + patch.slip.toFixed(3) + ' m<br>X: %{x:.1f} km<br>Y: %{y:.1f} km<br>Depth: %{z:.1f} km<extra></extra>'
+                    });
+                }
+                
+                const allX = patches.map(p => p.x);
+                const allY = patches.map(p => p.y);
+                const xExtent = Math.max(...allX) - Math.min(...allX);
+                const yExtent = Math.max(...allY) - Math.min(...allY);
+                const maxExtent = Math.max(xExtent, yExtent);
+                
+                const layout = {
+                    scene: {
+                        xaxis: {title: 'X (km)', range: [Math.min(...allX) - maxExtent*0.1, Math.min(...allX) + maxExtent*1.1]},
+                        yaxis: {title: 'Y (km)', range: [Math.min(...allY) - maxExtent*0.1, Math.min(...allY) + maxExtent*1.1]},
+                        zaxis: {title: 'Depth (km)', range: [100, 0]},
+                        aspectmode: 'manual',
+                        aspectratio: {x: 1, y: 1, z: 0.5}
+                    },
+                    margin: {l: 0, r: 0, t: 30, b: 0},
+                    showlegend: false
+                };
+                
+                Plotly.newPlot('plot-container', traces, layout);
+                
+            } else if (type === 'moment') {
+                // Moment release visualization - 3D colored patches
+                const patchLength = faultData.length / faultData.nAlong;
+                const patchWidth = faultData.width / faultData.nDown;
+                
+                // Fixed strike at 0 degrees (North)
+                const strikeRad = 0;
+                const dipRad = faultData.dip * Math.PI / 180;
+                const perpRad = strikeRad + Math.PI / 2;
+                
+                // Calculate moment for each patch
+                const area = patchLength * patchWidth * 1e6; // m²
+                const mu = 3e10; // Pa (shear modulus)
+                
+                // Calculate global min/max moment for color scale
+                const allMoments = patches.map(p => mu * area * (p.slip || 0));
+                const minMoment = Math.min(...allMoments);
+                const maxMoment = Math.max(...allMoments);
+                
+                // Create mesh traces for each patch
+                const traces = [];
+                
+                for (const patch of patches) {
+                    const i = patch.alongIdx;
+                    const j = patch.downIdx;
+                    const moment = mu * area * (patch.slip || 0);
+                    
+                    // Calculate 4 corners of this patch
+                    const alongStart = i * patchLength;
+                    const alongEnd = (i + 1) * patchLength;
+                    const downStart = j * patchWidth;
+                    const downEnd = (j + 1) * patchWidth;
+                    
+                    const corners = [
+                        {
+                            x: alongStart * Math.cos(strikeRad) + downStart * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongStart * Math.sin(strikeRad) + downStart * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downStart * Math.sin(dipRad)
+                        },
+                        {
+                            x: alongEnd * Math.cos(strikeRad) + downStart * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongEnd * Math.sin(strikeRad) + downStart * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downStart * Math.sin(dipRad)
+                        },
+                        {
+                            x: alongEnd * Math.cos(strikeRad) + downEnd * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongEnd * Math.sin(strikeRad) + downEnd * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downEnd * Math.sin(dipRad)
+                        },
+                        {
+                            x: alongStart * Math.cos(strikeRad) + downEnd * Math.cos(perpRad) * Math.cos(dipRad),
+                            y: alongStart * Math.sin(strikeRad) + downEnd * Math.sin(perpRad) * Math.cos(dipRad),
+                            z: faultData.topDepth + downEnd * Math.sin(dipRad)
+                        }
+                    ];
+                    
+                    traces.push({
+                        type: 'mesh3d',
+                        x: corners.map(c => c.x),
+                        y: corners.map(c => c.y),
+                        z: corners.map(c => c.z),
+                        i: [0, 0],
+                        j: [1, 2],
+                        k: [2, 3],
+                        intensity: [moment, moment, moment, moment],
+                        colorscale: 'Jet',
+                        cmin: minMoment,
+                        cmax: maxMoment,
+                        showscale: i === 0 && j === 0,
+                        colorbar: {
+                            title: 'Moment (N·m)'
+                        },
+                        flatshading: true,
+                        hovertemplate: 'Moment: ' + moment.toExponential(2) + ' N·m<br>X: %{x:.1f} km<br>Y: %{y:.1f} km<br>Depth: %{z:.1f} km<extra></extra>'
+                    });
+                }
+                
+                const allX = patches.map(p => p.x);
+                const allY = patches.map(p => p.y);
+                const xExtent = Math.max(...allX) - Math.min(...allX);
+                const yExtent = Math.max(...allY) - Math.min(...allY);
+                const maxExtent = Math.max(xExtent, yExtent);
+                
+                const layout = {
+                    scene: {
+                        xaxis: {title: 'X (km)', range: [Math.min(...allX) - maxExtent*0.1, Math.min(...allX) + maxExtent*1.1]},
+                        yaxis: {title: 'Y (km)', range: [Math.min(...allY) - maxExtent*0.1, Math.min(...allY) + maxExtent*1.1]},
+                        zaxis: {title: 'Depth (km)', range: [100, 0]},
+                        aspectmode: 'manual',
+                        aspectratio: {x: 1, y: 1, z: 0.5}
+                    },
+                    margin: {l: 0, r: 0, t: 30, b: 0},
+                    showlegend: false
+                };
+                
+                Plotly.newPlot('plot-container', traces, layout);
+            }
+        }
+        
+        // Visualize rupture time
+        function visualizeRuptureTime() {
+            if (!faultData) return;
+            
+            const patches = faultData.patches;
+            const patchLength = faultData.length / faultData.nAlong;
+            const patchWidth = faultData.width / faultData.nDown;
+            
+            // Fixed strike at 0 degrees (North)
+            const strikeRad = 0;
+            const dipRad = faultData.dip * Math.PI / 180;
+            const perpRad = strikeRad + Math.PI / 2;
+            
+            // Calculate hypocenter position from normalized coordinates
+            const hypoX = (faultData.hypoAlong || 0.5) * faultData.length;
+            const hypoY = (faultData.hypoDown || 0.5) * faultData.width;
+            const ruptureVel = faultData.ruptureVel || 3.0; // km/s
+            
+            // Calculate global min/max rupture time for color scale
+            const allRuptureTimes = patches.map(p => {
+                const dist = Math.sqrt(Math.pow(p.x - hypoX, 2) + Math.pow(p.y - hypoY, 2));
+                return dist / ruptureVel;
+            });
+            const minTime = Math.min(...allRuptureTimes);
+            const maxTime = Math.max(...allRuptureTimes);
+            
+            // Create mesh traces for each patch
+            const traces = [];
+            
+            for (const patch of patches) {
+                const i = patch.alongIdx;
+                const j = patch.downIdx;
+                
+                // Calculate rupture time for this patch
+                const dist = Math.sqrt(Math.pow(patch.x - hypoX, 2) + Math.pow(patch.y - hypoY, 2));
+                const ruptureTime = dist / ruptureVel;
+                
+                // Calculate 4 corners of this patch
+                const alongStart = i * patchLength;
+                const alongEnd = (i + 1) * patchLength;
+                const downStart = j * patchWidth;
+                const downEnd = (j + 1) * patchWidth;
+                
+                const corners = [
+                    {
+                        x: alongStart * Math.cos(strikeRad) + downStart * Math.cos(perpRad) * Math.cos(dipRad),
+                        y: alongStart * Math.sin(strikeRad) + downStart * Math.sin(perpRad) * Math.cos(dipRad),
+                        z: faultData.topDepth + downStart * Math.sin(dipRad)
+                    },
+                    {
+                        x: alongEnd * Math.cos(strikeRad) + downStart * Math.cos(perpRad) * Math.cos(dipRad),
+                        y: alongEnd * Math.sin(strikeRad) + downStart * Math.sin(perpRad) * Math.cos(dipRad),
+                        z: faultData.topDepth + downStart * Math.sin(dipRad)
+                    },
+                    {
+                        x: alongEnd * Math.cos(strikeRad) + downEnd * Math.cos(perpRad) * Math.cos(dipRad),
+                        y: alongEnd * Math.sin(strikeRad) + downEnd * Math.sin(perpRad) * Math.cos(dipRad),
+                        z: faultData.topDepth + downEnd * Math.sin(dipRad)
+                    },
+                    {
+                        x: alongStart * Math.cos(strikeRad) + downEnd * Math.cos(perpRad) * Math.cos(dipRad),
+                        y: alongStart * Math.sin(strikeRad) + downEnd * Math.sin(perpRad) * Math.cos(dipRad),
+                        z: faultData.topDepth + downEnd * Math.sin(dipRad)
+                    }
+                ];
+                
+                traces.push({
+                    type: 'mesh3d',
+                    x: corners.map(c => c.x),
+                    y: corners.map(c => c.y),
+                    z: corners.map(c => c.z),
+                    i: [0, 0],
+                    j: [1, 2],
+                    k: [2, 3],
+                    intensity: [ruptureTime, ruptureTime, ruptureTime, ruptureTime],
+                    colorscale: 'Viridis',
+                    cmin: minTime,
+                    cmax: maxTime,
+                    showscale: i === 0 && j === 0,
+                    colorbar: {
+                        title: 'Time (s)'
+                    },
+                    flatshading: true,
+                    hovertemplate: 'Rupture Time: ' + ruptureTime.toFixed(2) + ' s<br>X: %{x:.1f} km<br>Y: %{y:.1f} km<br>Depth: %{z:.1f} km<extra></extra>'
+                });
+            }
+            
+            const allX = patches.map(p => p.x);
+            const allY = patches.map(p => p.y);
+            const xExtent = Math.max(...allX) - Math.min(...allX);
+            const yExtent = Math.max(...allY) - Math.min(...allY);
+            const maxExtent = Math.max(xExtent, yExtent);
+            
+            const layout = {
+                scene: {
+                    xaxis: {title: 'X (km)', range: [Math.min(...allX) - maxExtent*0.1, Math.min(...allX) + maxExtent*1.1]},
+                    yaxis: {title: 'Y (km)', range: [Math.min(...allY) - maxExtent*0.1, Math.min(...allY) + maxExtent*1.1]},
+                    zaxis: {title: 'Depth (km)', range: [100, 0]},
+                    aspectmode: 'manual',
+                    aspectratio: {x: 1, y: 1, z: 0.5}
+                },
+                margin: {l: 0, r: 0, t: 30, b: 0},
+                showlegend: false
+            };
+            
+            Plotly.newPlot('plot-container', traces, layout);
+        }
+        
+        // Visualize source time function
+        function visualizeSTF() {
+            if (!faultData) return;
+            
+            const patches = faultData.patches;
+            
+            // Handle GeoJSON data (has moment and rupture_time already)
+            if (faultData.isGeoJSON) {
+                // Find max rupture time
+                let maxRuptureTime = Math.max(...patches.map(p => p.rupture_time || 0));
+                let maxRiseTime = 2.0; // Default rise time in seconds
+                
+                // Calculate total duration
+                const totalDuration = maxRuptureTime + (maxRiseTime * 2);
+                const dt = 0.1; // Time step in seconds
+                const nSteps = Math.ceil(totalDuration / dt);
+                
+                // Initialize arrays
+                const time = [];
+                const momentRate = new Array(nSteps).fill(0);
+                
+                for (let i = 0; i < nSteps; i++) {
+                    time.push(i * dt);
+                }
+                
+                // Create triangular STF for each patch
+                patches.forEach(patch => {
+                    const ruptureTime = patch.rupture_time || 0;
+                    const moment = patch.moment;
+                    const rise = maxRiseTime;
+                    const duration = rise * 2;
+                    const peakValue = (2 * moment) / duration;
+                    
+                    const startIdx = Math.floor(ruptureTime / dt);
+                    const peakIdx = startIdx + Math.floor(rise / dt);
+                    const endIdx = startIdx + Math.floor(duration / dt);
+                    
+                    // Rising edge
+                    for (let i = startIdx; i < peakIdx && i < nSteps; i++) {
+                        const t = (i - startIdx) * dt;
+                        momentRate[i] += (peakValue / rise) * t;
+                    }
+                    
+                    // Falling edge
+                    for (let i = peakIdx; i < endIdx && i < nSteps; i++) {
+                        const t = (i - peakIdx) * dt;
+                        momentRate[i] += peakValue - (peakValue / rise) * t;
+                    }
+                });
+                
+                const trace = {
+                    x: time,
+                    y: momentRate,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Source Time Function',
+                    line: {width: 2, color: 'blue'}
+                };
+                
+                const layout = {
+                    title: 'Source Time Function',
+                    xaxis: {title: 'Time (s)'},
+                    yaxis: {
+                        title: 'Moment Rate (N·m/s)',
+                        tickformat: '.2e'
+                    },
+                    margin: {l: 80, r: 40, t: 40, b: 60}
+                };
+                
+                Plotly.newPlot('plot-container', [trace], layout);
+                return;
+            }
+            
+            // Synthetic fault data
+            const patchLength = faultData.length / faultData.nAlong;
+            const patchWidth = faultData.width / faultData.nDown;
+            const patchArea = patchLength * patchWidth * 1e6; // m²
+            const mu = 3e10; // Pa (shear modulus)
+            
+            // Calculate rupture times and rise times for each patch
+            const hypoX = (faultData.hypoAlong || 0.5) * faultData.length;
+            const hypoY = (faultData.hypoDown || 0.5) * faultData.width;
+            const ruptureVel = faultData.ruptureVel || 3.0; // km/s
+            
+            // Find max rupture time and rise time
+            let maxRuptureTime = 0;
+            let maxRiseTime = 2.0; // Default rise time in seconds
+            
+            patches.forEach(patch => {
+                const dist = Math.sqrt(Math.pow(patch.x - hypoX, 2) + Math.pow(patch.y - hypoY, 2));
+                const ruptureTime = dist / ruptureVel;
+                maxRuptureTime = Math.max(maxRuptureTime, ruptureTime);
+            });
+            
+            // Calculate total duration (max rupture time + rise time fall duration)
+            const totalDuration = maxRuptureTime + (maxRiseTime * 2);
+            const dt = 0.1; // Time step in seconds
+            const nSteps = Math.ceil(totalDuration / dt);
+            
+            // Initialize arrays
+            const time = [];
+            const momentRate = new Array(nSteps).fill(0);
+            
+            for (let i = 0; i < nSteps; i++) {
+                time.push(i * dt);
+            }
+            
+            // Create triangular STF for each patch and sum them
+            patches.forEach(patch => {
+                const dist = Math.sqrt(Math.pow(patch.x - hypoX, 2) + Math.pow(patch.y - hypoY, 2));
+                const ruptureTime = dist / ruptureVel; // seconds
+                const moment = mu * patchArea * patch.slip; // N·m
+                const rise = maxRiseTime; // Use constant rise time
+                const duration = rise * 2; // Total duration of triangular function
+                
+                // Peak value to ensure area equals moment
+                const peakValue = (2 * moment) / duration;
+                
+                // Add triangular function to STF
+                const startIdx = Math.floor(ruptureTime / dt);
+                const peakIdx = startIdx + Math.floor(rise / dt);
+                const endIdx = startIdx + Math.floor(duration / dt);
+                
+                // Rising edge
+                for (let i = startIdx; i < peakIdx && i < nSteps; i++) {
+                    const t = (i - startIdx) * dt;
+                    momentRate[i] += (peakValue / rise) * t;
+                }
+                
+                // Falling edge
+                for (let i = peakIdx; i < endIdx && i < nSteps; i++) {
+                    const t = (i - peakIdx) * dt;
+                    momentRate[i] += peakValue - (peakValue / rise) * t;
+                }
+            });
+            
+            const trace = {
+                x: time,
+                y: momentRate,
+                type: 'scatter',
+                mode: 'lines',
+                fill: 'tozeroy',
+                line: {color: '#667eea', width: 2}
+            };
+            
+            const layout = {
+                title: 'Source Time Function',
+                xaxis: {title: 'Time (s)'},
+                yaxis: {
+                    title: 'Moment Rate (N·m/s)',
+                    tickformat: '.2e'
+                },
+                margin: {l: 80, r: 40, t: 40, b: 60}
+            };
+            
+            Plotly.newPlot('plot-container', [trace], layout);
+        }
+
+        // Load GeoJSON and show in kinematics window
+        async function loadGeoJSON() {
+            const fileInput = document.getElementById('geojson-file');
+            if (!fileInput.files.length) {
+                alert('Please select a GeoJSON file');
+                return;
+            }
+            
+            try {
+                // Read file
+                const file = fileInput.files[0];
+                const text = await file.text();
+                const geojsonData = JSON.parse(text);
+                
+                // Call backend API to load and process GeoJSON
+                const response = await fetch('http://localhost:5001/api/geojson/load', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(geojsonData)
+                });
+                
+                if (!response.ok) throw new Error('Failed to load GeoJSON');
+                
+                const result = await response.json();
+                
+                // Store fault data globally
+                faultData = {
+                    patches: result.patches,
+                    totalMoment: result.totalMoment,
+                    computedMw: result.computedMw,
+                    averageSlip: result.averageSlip,
+                    nAlong: result.nAlong,
+                    nDown: result.nDown,
+                    length: result.length,
+                    width: result.width,
+                    corners: [], // No corners for GeoJSON
+                    isGeoJSON: true // Flag to indicate GeoJSON data
+                };
+                
+                // Hide home screen and show workspace directly at kinematics
+                const homeEl = document.getElementById('home');
+                const workspaceEl = document.getElementById('workspace');
+                
+                if (homeEl) homeEl.classList.add('hidden');
+                if (workspaceEl) workspaceEl.classList.remove('hidden');
+                
+                // Hide all panels except kinematics (visualization only)
+                const geometryPanelEl = document.getElementById('geometry-panel');
+                const kinematicsPanelEl = document.getElementById('kinematics-panel');
+                const subsourcesPanelEl = document.getElementById('subsources-panel');
+                
+                if (geometryPanelEl) geometryPanelEl.style.transform = 'translateX(-100%)';
+                if (kinematicsPanelEl) kinematicsPanelEl.style.transform = 'translateX(0)';
+                if (subsourcesPanelEl) subsourcesPanelEl.style.transform = 'translateX(100%)';
+                
+                // Update progress to step 2
+                updateProgressSteps(2);
+                
+                // Show visualization controls (but no input controls)
+                const kinematicsVizEl = document.getElementById('kinematics-viz-selector');
+                const proceedSubsourcesEl = document.getElementById('proceed-subsources-btn');
+                const computeKinematicsEl = document.getElementById('compute-kinematics-btn');
+                const backButtonEl = document.getElementById('back-to-geometry-btn');
+                const kinematicsControlsEl = document.getElementById('kinematics-controls');
+                
+                if (kinematicsVizEl) kinematicsVizEl.classList.remove('hidden');
+                if (proceedSubsourcesEl) proceedSubsourcesEl.classList.remove('hidden');
+                if (computeKinematicsEl) computeKinematicsEl.classList.add('hidden');
+                if (backButtonEl) backButtonEl.classList.add('hidden'); // Hide back button for GeoJSON
+                if (kinematicsControlsEl) kinematicsControlsEl.classList.add('hidden'); // Hide input controls
+                
+                // Show initial visualization
+                currentTab = 'slip';
+                updateKinematicsVisualization();
+                
+                alert(`Loaded ${result.numPatches} patches from GeoJSON\nMw: ${result.computedMw.toFixed(2)}\nAvg Slip: ${result.averageSlip.toFixed(2)} m`);
+                
+            } catch (error) {
+                console.error('Error loading GeoJSON:', error);
+                alert('Error loading GeoJSON: ' + error.message);
+            }
+        }
+
+        // About modal functions
+        function showAbout() {
+            document.getElementById('about-modal').classList.remove('hidden');
+        }
+
+        function closeAbout() {
+            document.getElementById('about-modal').classList.add('hidden');
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('about-modal');
+            if (event.target === modal) {
+                closeAbout();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeAbout();
+            }
+        });
+    </script>
+
+</body>
+</html>
