@@ -161,6 +161,26 @@ Server will run at: `http://localhost:5001`
 
 API documentation at: `http://localhost:5001/docs`
 
+## Deploying on Render
+
+This repository includes a `render.yaml` blueprint for one-click deployment.
+
+### Option A: Blueprint (recommended)
+
+1. Push this repository to GitHub
+2. In Render, choose **New +** → **Blueprint**
+3. Select this repository
+4. Render reads `render.yaml` and creates the web service automatically
+
+### Option B: Manual Web Service
+
+- **Environment**: Python
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `python -m uvicorn app:app --host 0.0.0.0 --port $PORT`
+- **Health Check Path**: `/health`
+
+After deployment, your app will be available at your Render service URL, and API docs at `/docs`.
+
 ## Usage Example
 
 ```python
