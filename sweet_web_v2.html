@@ -3011,12 +3011,18 @@
                 // Simulate progress during download (since we can't track real progress)
                 const progressSimulator = setInterval(() => {
                     const currentProgress = parseFloat(document.getElementById('progress-bar-fill').style.width) || 5;
-                    if (currentProgress < 60) {  // Don't go beyond 60% during download
-                        showProgress(
-                            'Downloading and processing templates...', 
-                            currentProgress + 2,
-                            `Processing ${stations.length} stations with ${nRealizations} realization(s) each`
-                        );
+                    if (currentProgress < 85) {  // Continue up to 85%
+                        // Fast progress initially (2% per second up to 40%)
+                        // Then slow down (0.5% per second from 40% to 85%)
+                        const increment = currentProgress < 40 ? 2 : 0.5;
+                        const message = currentProgress < 40 
+                            ? 'Downloading templates from S3...' 
+                            : 'Computing waveforms...';
+                        const detail = currentProgress < 40
+                            ? `Loading templates for ${stations.length} stations (first run: ~30-60s, cached: instant)`
+                            : `Processing ${stations.length} stations × ${nRealizations} realization(s) each`;
+                        
+                        showProgress(message, currentProgress + increment, detail);
                     }
                 }, 1000);
                 
@@ -3046,7 +3052,7 @@
                         throw new Error(`Waveform summation failed: ${error}`);
                     }
                     
-                    showProgress('Computing waveform summation...', 65, 'Combining templates and computing synthetics');
+                    showProgress('Waveform summation complete!', 90, 'Preparing analysis...');
                     
                     currentWaveformResult = await sumResponse.json();
                 } catch (error) {
@@ -3060,7 +3066,7 @@
                 
                 console.log('Waveforms computed:', currentWaveformResult);
                 
-                showProgress('Analyzing waveforms...', 75, 'Computing PGA, PGV, and generating plots');
+                showProgress('Analyzing waveforms...', 95, 'Computing PGA, PGV, and generating plots');
                 
                 // Call API to analyze waveforms
                 const analysisResponse = await fetch('/api/waveforms/analyze', {
@@ -3078,8 +3084,6 @@
                     const error = await analysisResponse.text();
                     throw new Error(`Waveform analysis failed: ${error}`);
                 }
-                
-                showProgress('Generating plots...', 90, 'Creating shakemap and distance plots');
                 
                 currentAnalysisResult = await analysisResponse.json();
                 
