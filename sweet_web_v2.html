@@ -961,6 +961,9 @@
             // Compute groups
             const groups = computeSubsourceGroups(momentThreshold);
             
+            // Store globally for API use
+            window.currentGrouping = { groups: groups, momentThreshold: momentThreshold };
+            
             // Calculate actual magnitude for each group
             const patchLength = faultData.length / faultData.nAlong;
             const patchWidth = faultData.width / faultData.nDown;
@@ -3072,10 +3075,22 @@
         
         // Prepare subsources data for API
         function prepareSubsourcesForAPI() {
-            const subsources = [];
+            // Check if grouping data exists
+            if (!window.currentGrouping || !window.currentGrouping.groups) {
+                console.error('No subsource grouping found. Please complete Step 3: Subsource Grouping first.');
+                throw new Error('Please complete subsource grouping (Step 3) before computing waveforms.');
+            }
             
-            for (const [groupKey, patchIndices] of Object.entries(currentGrouping.groups)) {
-                const groupNum = parseInt(groupKey);
+            if (!globalKinematicsResult || !globalKinematicsResult.patches) {
+                console.error('No kinematics result found.');
+                throw new Error('Please complete kinematics computation (Step 2) before computing waveforms.');
+            }
+            
+            const subsources = [];
+            const groups = window.currentGrouping.groups;
+            
+            for (let groupIdx = 0; groupIdx < groups.length; groupIdx++) {
+                const patchIndices = groups[groupIdx];
                 let totalMoment = 0;
                 let totalTrup = 0;
                 let sumLon = 0;
