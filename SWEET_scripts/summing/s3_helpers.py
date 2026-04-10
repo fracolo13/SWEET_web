@@ -170,9 +170,11 @@ class S3TemplateLoader:
             logger.info("Loading template info from cached summary")
             with open(summary_cache) as f:
                 data = json.load(f)
-                # Normalize key name (handle both 'vs30' and 'vs30_values')
+                # Normalize key names
                 if 'vs30_values' in data and 'vs30' not in data:
                     data['vs30'] = data['vs30_values']
+                if 'distance_bins' in data and 'distances' not in data:
+                    data['distances'] = data['distance_bins']
                 return data
         
         # Try to download summary from S3
@@ -186,9 +188,11 @@ class S3TemplateLoader:
             logger.info("Downloaded preprocessing_summary.json from S3")
             with open(summary_cache) as f:
                 data = json.load(f)
-                # Normalize key name (handle both 'vs30' and 'vs30_values')
+                # Normalize key names
                 if 'vs30_values' in data and 'vs30' not in data:
                     data['vs30'] = data['vs30_values']
+                if 'distance_bins' in data and 'distances' not in data:
+                    data['distances'] = data['distance_bins']
                 return data
         except ClientError:
             logger.warning("preprocessing_summary.json not found in S3, scanning structure...")
