@@ -169,7 +169,11 @@ class S3TemplateLoader:
         if summary_cache.exists():
             logger.info("Loading template info from cached summary")
             with open(summary_cache) as f:
-                return json.load(f)
+                data = json.load(f)
+                # Normalize key name (handle both 'vs30' and 'vs30_values')
+                if 'vs30_values' in data and 'vs30' not in data:
+                    data['vs30'] = data['vs30_values']
+                return data
         
         # Try to download summary from S3
         s3_summary_key = f"{self.prefix}preprocessing_summary.json"
@@ -181,14 +185,18 @@ class S3TemplateLoader:
             )
             logger.info("Downloaded preprocessing_summary.json from S3")
             with open(summary_cache) as f:
-                return json.load(f)
+                data = json.load(f)
+                # Normalize key name (handle both 'vs30' and 'vs30_values')
+                if 'vs30_values' in data and 'vs30' not in data:
+                    data['vs30'] = data['vs30_values']
+                return data
         except ClientError:
             logger.warning("preprocessing_summary.json not found in S3, scanning structure...")
         
         # Fallback: scan S3 structure (slower)
-        vs30_dirs = set()
-        mag_dirs = set()
-        dist_dirs = set()
+        vs30_set = set()
+        mag_set = set()
+        dist_set = set()
         
         # List all objects with common prefixes
         paginator = self.s3_client.get_paginator('list_objects_v2')
@@ -199,35 +207,51 @@ class S3TemplateLoader:
                 for prefix_obj in page['CommonPrefixes']:
                     vs30_dir = prefix_obj['Prefix'].split('/')[-2]
                     if vs30_dir.startswith('vs30_'):
-                        vs30_dirs.add(vs30_dir)
+                        try:
+                            vs30_val = int(vs30_dir.split('_')[1])
+                            vs30_set.add(vs30_val)
+                        except (IndexError, ValueError):
+                            continue
         
         # For each VS30, get magnitudes and distances (sample first VS30 only to save time)
-        if vs30_dirs:
-            sample_vs30 = sorted(vs30_dirs)[0]
-            vs30_prefix = f"{self.prefix}{sample_vs30}/"
+        if vs30_set:
+            # Use first VS30 directory name for sampling
+            first_vs30 = sorted(vs30_set)[0]
+            sample_vs30_dir = f"vs30_{first_vs30}"
+            vs30_prefix = f"{self.prefix}{sample_vs30_dir}/"
             
             for page in paginator.paginate(Bucket=self.bucket_name, Prefix=vs30_prefix, Delimiter='/'):
                 if 'CommonPrefixes' in page:
                     for prefix_obj in page['CommonPrefixes']:
                         mag_dir = prefix_obj['Prefix'].split('/')[-2]
                         if mag_dir.startswith('M'):
-                            mag_dirs.add(mag_dir)
+                            try:
+                                mag_val = float(mag_dir[1:])
+                                mag_set.add(mag_val)
+                            except ValueError:
+                                continue
             
-            if mag_dirs:
-                sample_mag = sorted(mag_dirs)[0]
-                mag_prefix = f"{vs30_prefix}{sample_mag}/"
+            if mag_set:
+                # Use first magnitude directory name for sampling
+                first_mag = sorted(mag_set)[0]
+                sample_mag_dir = f"M{first_mag}"
+                mag_prefix = f"{vs30_prefix}{sample_mag_dir}/"
                 
                 for page in paginator.paginate(Bucket=self.bucket_name, Prefix=mag_prefix, Delimiter='/'):
                     if 'CommonPrefixes' in page:
                         for prefix_obj in page['CommonPrefixes']:
                             dist_dir = prefix_obj['Prefix'].split('/')[-2]
                             if dist_dir.endswith('km'):
-                                dist_dirs.add(dist_dir)
+                                try:
+                                    dist_val = int(dist_dir[:-2])
+                                    dist_set.add(dist_val)
+                                except ValueError:
+                                    continue
         
         info = {
-            'vs30': sorted(vs30_dirs),
-            'magnitudes': sorted(mag_dirs),
-            'distances': sorted(dist_dirs)
+            'magnitudes': sorted(list(mag_set)),
+            'vs30': sorted(list(vs30_set)),
+            'distances': sorted(list(dist_set))
         }
         
         # Cache the info
