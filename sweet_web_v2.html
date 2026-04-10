@@ -3004,9 +3004,9 @@
                     `Loading ~${estimatedTemplates} templates (first run may take 30-60s, cached runs are instant)`
                 );
                 
-                // Set a client-side timeout (5 minutes) for long S3 downloads
+                // Set a client-side timeout (10 minutes) for long S3 downloads
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
+                const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min timeout
                 
                 // Simulate progress during download (since we can't track real progress)
                 const progressSimulator = setInterval(() => {
@@ -3019,7 +3019,7 @@
                             ? 'Downloading templates from S3...' 
                             : 'Computing waveforms...';
                         const detail = currentProgress < 40
-                            ? `Loading templates for ${stations.length} stations (first run: ~30-60s, cached: instant)`
+                            ? `Loading templates for ${stations.length} stations (first run: ~1-2min, cached: instant)`
                             : `Processing ${stations.length} stations × ${nRealizations} realization(s) each`;
                         
                         showProgress(message, currentProgress + increment, detail);
@@ -3059,7 +3059,7 @@
                     clearInterval(progressSimulator);
                     clearTimeout(timeoutId);
                     if (error.name === 'AbortError') {
-                        throw new Error('Request timed out after 5 minutes. This can happen on first run when downloading templates from S3. Try again with fewer stations (e.g., 10-20) to build the cache first.');
+                        throw new Error('Request timed out after 10 minutes. This can happen on first run when downloading templates from S3. Try again with fewer stations (e.g., 10-20) to build the cache first.');
                     }
                     throw error;
                 }
