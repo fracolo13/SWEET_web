@@ -867,6 +867,45 @@
             // Generate fault with full parameters
             generateFault();
             
+            // Compute kinematics (rupture time, moment) for each patch
+            if (faultData) {
+                const patchArea = (faultData.length / faultData.nAlong) * (faultData.width / faultData.nDown) * 1e6; // m²
+                const mu = 3e10; // Pa (shear modulus)
+                const hypoI = Math.floor(faultData.hypoAlong * faultData.nAlong);
+                const hypoJ = Math.floor(faultData.hypoDown * faultData.nDown);
+                const ruptureVel = faultData.ruptureVel; // km/s
+                
+                // Add kinematics to patches
+                faultData.patches.forEach((patch, idx) => {
+                    // Calculate moment for this patch
+                    patch.moment = mu * patchArea * patch.slip;
+                    
+                    // Calculate rupture time based on distance from hypocenter
+                    const di = (patch.alongIdx - hypoI) * (faultData.length / faultData.nAlong);
+                    const dj = (patch.downIdx - hypoJ) * (faultData.width / faultData.nDown);
+                    const distance = Math.sqrt(di * di + dj * dj); // km
+                    patch.rupture_time = distance / ruptureVel; // seconds
+                    
+                    // Add centroid coordinates (lat/lon/depth)
+                    const hypoLat = parseFloat(document.getElementById('hypo-lat').value);
+                    const hypoLon = parseFloat(document.getElementById('hypo-lon').value);
+                    
+                    // Simple approximation: 1 degree lat ≈ 111 km, 1 degree lon ≈ 111 km * cos(lat)
+                    patch.centroid_lat = hypoLat + patch.y / 111.0;
+                    patch.centroid_lon = hypoLon + patch.x / (111.0 * Math.cos(hypoLat * Math.PI / 180));
+                    patch.depth = patch.z;
+                });
+                
+                // Store as globalKinematicsResult for API use
+                window.globalKinematicsResult = {
+                    patches: faultData.patches,
+                    n_along: faultData.nAlong,
+                    n_down: faultData.nDown,
+                    computed_mw: faultData.computedMw,
+                    total_moment: faultData.totalMoment
+                };
+            }
+            
             // Update progress to step 2
             updateProgressSteps(2);
             
