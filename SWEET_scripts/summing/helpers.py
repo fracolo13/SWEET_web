@@ -226,11 +226,17 @@ def load_template(
     # Use S3 if enabled
     if USE_S3_TEMPLATES and S3_AVAILABLE:
         try:
-            return load_template_from_s3(vs30_dir, mag_dir, dist_dir, template_file)
-        except FileNotFoundError:
+            print(f'[DEBUG] Loading from S3: {vs30_dir}/{mag_dir}/{dist_dir}/{template_file}')
+            template = load_template_from_s3(vs30_dir, mag_dir, dist_dir, template_file)
+            print(f'[DEBUG] Loaded template shape: {template.shape}')
+            return template
+        except FileNotFoundError as e:
+            print(f'[WARNING] Template not found in S3: {vs30_dir}/{mag_dir}/{dist_dir}/{template_file}')
             return None
         except Exception as e:
-            print(f'[WARNING] Failed to load template from S3: {e}')
+            print(f'[ERROR] Failed to load template from S3: {e}')
+            import traceback
+            traceback.print_exc()
             return None
     
     # Local filesystem

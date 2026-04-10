@@ -255,10 +255,13 @@ def sum_waveforms(
                 tmpl_dist = find_closest_distance(avail_dists, tmpl_dist)
                 
                 # Load template
+                print(f'[DEBUG] Loading template for {sta_code}: VS30={tmpl_vs30}, Mag={tmpl_mag}, Dist={tmpl_dist}km, Real={real_idx}')
                 envelope = load_template(
                     templates_dir,
                     tmpl_vs30, tmpl_mag, tmpl_dist, real_idx
                 )
+                
+                print(f'[DEBUG] Template result for {sta_code}: {"FOUND" if envelope is not None else "NONE"}')
                 
                 if envelope is None:
                     if ss_idx == 0:
@@ -298,6 +301,12 @@ def sum_waveforms(
         
         print(f'  Templates found for {len(stats["stations_ok"])} stations, '
               f'missing for {len(stats["stations_missing"])} stations.')
+        print(f'[DEBUG] Total traces collected: {sum(len(trs) for trs in traces_dict.values())}')
+        print(f'[DEBUG] Unique (station, channel) pairs: {len(traces_dict)}')
+        
+        if not traces_dict:
+            print('[ERROR] No traces collected! Check template loading.')
+            raise ValueError(f"No waveforms generated. Check that templates exist for VS30={avail_vs30}, Mag={avail_mags}, Dist={avail_dists}")
         
         # Sum contributions for every (station, channel)
         summed_traces = []
