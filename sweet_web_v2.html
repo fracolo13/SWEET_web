@@ -2830,6 +2830,9 @@
         
         // Compute waveforms
         async function computeWaveforms() {
+            console.log('=== computeWaveforms CALLED ===');
+            alert('computeWaveforms function was called!');
+            
             try {
                 showWaveformStatus('Computing waveforms...', 'progress');
                 
