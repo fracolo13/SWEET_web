@@ -212,7 +212,7 @@ def load_template(
         vs30: VS30 value
         magnitude: Magnitude
         distance_km: Source-to-station distance in km
-        realization_idx: Realization index (0-based)
+        realization_idx: Realization index (0-based) - used to pick random template
         
     Returns:
         Template array of shape (3, n_samples) [E, N, Z] or None if not found
@@ -221,17 +221,27 @@ def load_template(
     vs30_dir = f'vs30_{int(vs30)}'
     mag_dir = f'M{magnitude:.1f}'
     dist_dir = f'{int(distance_km):03d}km'
-    template_file = f'template_{realization_idx:02d}.npy'
     
     # Use S3 if enabled
     if USE_S3_TEMPLATES and S3_AVAILABLE:
         try:
+            # List templates in this bin and pick one based on realization_idx
+            loader = get_s3_loader()
+            available_templates = loader.list_templates(vs30_dir, mag_dir, dist_dir)
+            
+            if not available_templates:
+                print(f'[WARNING] No templates found in S3: {vs30_dir}/{mag_dir}/{dist_dir}')
+                return None
+            
+            # Pick template using modulo to wrap around if needed
+            template_file = available_templates[realization_idx % len(available_templates)]
+            
             print(f'[DEBUG] Loading from S3: {vs30_dir}/{mag_dir}/{dist_dir}/{template_file}')
             template = load_template_from_s3(vs30_dir, mag_dir, dist_dir, template_file)
             print(f'[DEBUG] Loaded template shape: {template.shape}')
             return template
         except FileNotFoundError as e:
-            print(f'[WARNING] Template not found in S3: {vs30_dir}/{mag_dir}/{dist_dir}/{template_file}')
+            print(f'[WARNING] Template not found in S3: {vs30_dir}/{mag_dir}/{dist_dir}')
             return None
         except Exception as e:
             print(f'[ERROR] Failed to load template from S3: {e}')
@@ -239,7 +249,8 @@ def load_template(
             traceback.print_exc()
             return None
     
-    # Local filesystem
+    # Local filesystem - look for template_{idx}.npy pattern
+    template_file = f'template_{realization_idx:02d}.npy'
     template_path = os.path.join(
         templates_dir, vs30_dir, mag_dir, dist_dir, template_file
     )
