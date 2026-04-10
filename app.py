@@ -16,7 +16,7 @@ from models.geometry import GeometryInput, FaultGeometry
 from models.kinematics import KinematicsInput, FaultKinematics
 from models.subsources import SubsourceInput, SubsourceResult
 from models.geojson import GeoJSONFaultModel
-from models.waveforms import WaveformSummationInput, WaveformSummationResult
+from models.waveforms import WaveformSummationInput, WaveformSummationResult, WaveformAnalysisInput
 from services.geometry_service import generate_fault_geometry
 from services.kinematics_service import generate_fault_kinematics
 from services.grouping_service import compute_subsource_groups
@@ -443,12 +443,7 @@ async def sum_waveforms_endpoint(params: WaveformSummationInput):
 
 
 @app.post("/api/waveforms/analyze")
-async def analyze_waveforms_endpoint(
-    mseed_file: str,
-    subsources: List[Dict],
-    stations: List[Dict],
-    title_prefix: str = "Synthetic Event"
-):
+async def analyze_waveforms_endpoint(params: WaveformAnalysisInput):
     """
     Analyze waveforms and generate plots.
     
@@ -460,10 +455,7 @@ async def analyze_waveforms_endpoint(
     - Exporting statistics and detailed CSV
     
     Args:
-        mseed_file: Path to MSEED file to analyze
-        subsources: Subsource data for fault outline
-        stations: Station data
-        title_prefix: Prefix for plot titles
+        params: Analysis parameters including mseed_file, subsources, stations, title_prefix
         
     Returns:
         Dictionary with plot paths, statistics, and data files
@@ -478,21 +470,21 @@ async def analyze_waveforms_endpoint(
         
         from analyze_from_web import generate_all_plots
         
-        logger.info(f"Analyzing waveforms from {mseed_file}")
+        logger.info(f"Analyzing waveforms from {params.mseed_file}")
         
-        if not os.path.exists(mseed_file):
-            raise HTTPException(status_code=404, detail=f"MSEED file not found: {mseed_file}")
+        if not os.path.exists(params.mseed_file):
+            raise HTTPException(status_code=404, detail=f"MSEED file not found: {params.mseed_file}")
         
         # Create output directory
-        output_dir = os.path.join(os.path.dirname(mseed_file), 'plots')
+        output_dir = os.path.join(os.path.dirname(params.mseed_file), 'plots')
         
         # Generate all plots and analysis
         result = generate_all_plots(
-            mseed_file=mseed_file,
-            stations=stations,
-            subsources=subsources,
+            mseed_file=params.mseed_file,
+            stations=params.stations,
+            subsources=params.subsources,
             output_dir=output_dir,
-            title_prefix=title_prefix
+            title_prefix=params.title_prefix
         )
         
         logger.info(f"Analysis complete: {result['statistics']['num_stations']} stations analyzed")

@@ -47,3 +47,11 @@ class WaveformSummationResult(BaseModel):
     output_files: List[str]
     success: bool
     message: str
+
+
+class WaveformAnalysisInput(BaseModel):
+    """Input parameters for waveform analysis."""
+    mseed_file: str = Field(..., description="Path to MSEED file")
+    subsources: List[Dict[str, Any]] = Field(..., description="Subsource data")
+    stations: List[Dict[str, Any]] = Field(..., description="Station data")
+    title_prefix: str = Field("Synthetic Event", description="Title prefix for plots")
