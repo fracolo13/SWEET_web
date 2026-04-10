@@ -2831,22 +2831,30 @@
         // Compute waveforms
         async function computeWaveforms() {
             console.log('=== computeWaveforms CALLED ===');
-            alert('computeWaveforms function was called!');
             
             try {
+                console.log('Step 1: Calling showWaveformStatus...');
                 showWaveformStatus('Computing waveforms...', 'progress');
+                console.log('Step 1: OK');
                 
                 // Get configuration
+                console.log('Step 2: Getting DOM elements...');
                 const templatesDir = document.getElementById('templates-dir').value;
                 const nRealizations = parseInt(document.getElementById('n-realizations').value);
+                console.log('Step 2: OK', { templatesDir, nRealizations });
                 
                 // Prepare subsources data
+                console.log('Step 3: Preparing subsources...');
                 const subsources = prepareSubsourcesForAPI();
+                console.log('Step 3: OK, subsources:', subsources.length);
                 
                 // Prepare stations data
+                console.log('Step 4: Preparing stations...');
                 const stations = prepareStationsForAPI();
+                console.log('Step 4: OK, stations:', stations.length);
                 
                 if (!stations || stations.length === 0) {
+                    console.log('ERROR: No stations found!');
                     showWaveformStatus('Please generate or load stations first!', 'error');
                     return;
                 }
@@ -2921,7 +2929,9 @@
                 }, 2000);
                 
             } catch (error) {
-                console.error('Error computing waveforms:', error);
+                console.error('!!! EXCEPTION in computeWaveforms:', error);
+                console.error('Stack trace:', error.stack);
+                alert('ERROR: ' + error.message);
                 showWaveformStatus(`❌ Error: ${error.message}`, 'error');
             }
         }
