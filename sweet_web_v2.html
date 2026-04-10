@@ -449,9 +449,9 @@
                             <!-- Number of Stations -->
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Number of Stations: <span id="num-stations-value" class="text-blue-600 font-semibold">10</span>
+                                    Number of Stations: <span id="num-stations-value" class="text-blue-600 font-semibold">5</span>
                                 </label>
-                                <input type="range" id="num-stations" min="5" max="200" step="5" value="10" class="w-full" oninput="document.getElementById('num-stations-value').textContent = this.value">
+                                <input type="range" id="num-stations" min="5" max="200" step="5" value="5" class="w-full" oninput="document.getElementById('num-stations-value').textContent = this.value">
                             </div>
                             
                             <!-- Max Distance -->
@@ -485,6 +485,10 @@
                                 <i class="fas fa-wave-square mr-2 text-purple-500"></i>
                                 Waveform Configuration
                             </h4>
+                            
+                            <div class="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                                <strong>⚠️ First Run:</strong> Start with 5-10 stations to build the template cache (~30s). Once cached, you can use 100+ stations.
+                            </div>
                             
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Templates Directory</label>
@@ -2908,7 +2912,12 @@
                     nRealizations
                 });
                 
-                showWaveformStatus('Loading templates from S3... This may take 1-2 minutes on first run.', 'progress');
+                // Estimate number of unique templates needed
+                const estimatedTemplates = Math.min(stations.length * 5, 100); // Rough estimate
+                showWaveformStatus(
+                    `Downloading ~${estimatedTemplates} templates from S3 (first run only)... This may take up to 30 seconds. Server will timeout if it takes longer - try fewer stations first.`, 
+                    'progress'
+                );
                 
                 // Set a client-side timeout (5 minutes) for long S3 downloads
                 const controller = new AbortController();
