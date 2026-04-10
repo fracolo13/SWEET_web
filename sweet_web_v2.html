@@ -3065,7 +3065,7 @@
             // Statistics CSV
             if (currentAnalysisResult.data.statistics_csv) {
                 const statsLink = document.createElement('a');
-                statsLink.href = currentAnalysisResult.data.statistics_csv;
+                statsLink.href = currentAnalysisResult.data.statistics_csv;  // data URL
                 statsLink.className = 'block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm text-center font-medium';
                 statsLink.innerHTML = '<i class="fas fa-table mr-2"></i>Statistics (CSV)';
                 statsLink.download = 'statistics.csv';
@@ -3075,14 +3075,14 @@
             // Detailed CSV
             if (currentAnalysisResult.data.detailed_csv) {
                 const csvLink = document.createElement('a');
-                csvLink.href = currentAnalysisResult.data.detailed_csv;
+                csvLink.href = currentAnalysisResult.data.detailed_csv;  // data URL
                 csvLink.className = 'block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm text-center font-medium mt-2';
                 csvLink.innerHTML = '<i class="fas fa-chart-line mr-2"></i>Detailed Analysis (CSV)';
                 csvLink.download = 'waveform_analysis.csv';
                 dataLinks.appendChild(csvLink);
             }
             
-            // Statistics JSON (from result.data.statistics object)
+            // Statistics JSON (from result.statistics object)
             const statsJsonBtn = document.createElement('button');
             statsJsonBtn.className = 'block w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm text-center font-medium mt-2';
             statsJsonBtn.innerHTML = '<i class="fas fa-code mr-2"></i>Statistics (JSON)';
@@ -3133,13 +3133,13 @@
                 imgContainer.className = 'p-2 bg-gray-50';
                 
                 const img = document.createElement('img');
-                img.src = path;  // path is now an HTTP URL
+                img.src = path;  // path is now a base64 data URL
                 img.alt = plotNames[key];
                 img.className = 'w-full h-auto cursor-pointer hover:opacity-90 transition';
                 img.onclick = () => openPlotModal(path, plotNames[key]);
                 
                 const downloadBtn = document.createElement('a');
-                downloadBtn.href = path;
+                downloadBtn.href = path;  // data URL
                 downloadBtn.download = `${key}.png`;
                 downloadBtn.className = 'block mt-2 px-4 py-2 bg-purple-600 text-white text-center rounded hover:bg-purple-700 transition text-sm font-medium';
                 downloadBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Download Plot';

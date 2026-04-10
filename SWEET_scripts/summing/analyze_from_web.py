@@ -23,12 +23,32 @@ from scipy.signal import detrend as sp_detrend
 from scipy.interpolate import griddata
 from obspy import read
 import json
+import base64
 from typing import Dict, List, Optional, Tuple
 import sys
 
 # Import helpers
 sys.path.insert(0, os.path.dirname(__file__))
 from helpers import haversine_distance, moment2magnitude
+
+
+def file_to_base64_data_url(file_path: str) -> str:
+    """Convert a file to a base64 data URL."""
+    with open(file_path, 'rb') as f:
+        data = base64.b64encode(f.read()).decode('utf-8')
+    
+    # Determine MIME type
+    ext = os.path.splitext(file_path)[1].lower()
+    mime_types = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.csv': 'text/csv',
+        '.json': 'application/json'
+    }
+    mime_type = mime_types.get(ext, 'application/octet-stream')
+    
+    return f"data:{mime_type};base64,{data}"
 
 
 def analyze_waveforms(
@@ -477,16 +497,24 @@ def generate_all_plots(
     csv_file = os.path.join(output_dir, 'waveform_analysis.csv')
     analysis_df.to_csv(csv_file, index=False)
     
+    # Also create a simple statistics CSV
+    stats_csv_file = os.path.join(output_dir, 'statistics.csv')
+    stats_df = pd.DataFrame([stats])
+    stats_df.to_csv(stats_csv_file, index=False)
+    
+    # Convert all files to base64 data URLs
+    waveform_overview_file = os.path.join(output_dir, 'waveform_overview.png')
+    
     return {
         'plots': {
-            'waveform_overview': os.path.join(output_dir, 'waveform_overview.png'),
-            'pga_vs_distance': pga_file,
-            'pgv_vs_distance': pgv_file,
-            'shakemap': shakemap_file
+            'waveform_overview': file_to_base64_data_url(waveform_overview_file),
+            'pga_vs_distance': file_to_base64_data_url(pga_file),
+            'pgv_vs_distance': file_to_base64_data_url(pgv_file),
+            'shakemap': file_to_base64_data_url(shakemap_file)
         },
         'data': {
-            'statistics': stats_file,
-            'detailed_csv': csv_file
+            'statistics_csv': file_to_base64_data_url(stats_csv_file),
+            'detailed_csv': file_to_base64_data_url(csv_file)
         },
         'statistics': stats,
         'chosen_stations': chosen_stations
