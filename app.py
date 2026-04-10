@@ -487,6 +487,28 @@ async def analyze_waveforms_endpoint(params: WaveformAnalysisInput):
             title_prefix=params.title_prefix
         )
         
+        # Convert local file paths to HTTP URLs
+        base_dir = os.path.dirname(params.mseed_file)
+        session_id = os.path.basename(base_dir)
+        
+        # Update plot paths to HTTP URLs
+        for plot_key in ['waveform_overview', 'pga_vs_distance', 'pgv_vs_distance', 'shakemap']:
+            if plot_key in result['plots']:
+                filename = os.path.basename(result['plots'][plot_key])
+                result['plots'][plot_key] = f"/api/waveforms/file/{session_id}/plots/{filename}"
+        
+        # Update data file paths to HTTP URLs
+        if 'statistics_csv' in result['data']:
+            filename = os.path.basename(result['data']['statistics_csv'])
+            result['data']['statistics_csv'] = f"/api/waveforms/file/{session_id}/plots/{filename}"
+        
+        if 'detailed_csv' in result['data']:
+            filename = os.path.basename(result['data']['detailed_csv'])
+            result['data']['detailed_csv'] = f"/api/waveforms/file/{session_id}/plots/{filename}"
+        
+        # Store session_id for file downloads
+        result['session_id'] = session_id
+        
         logger.info(f"Analysis complete: {result['statistics']['num_stations']} stations analyzed")
         
         return result
@@ -494,6 +516,47 @@ async def analyze_waveforms_endpoint(params: WaveformAnalysisInput):
     except Exception as e:
         logger.error(f"Error analyzing waveforms: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/waveforms/file/{session_id}/{subpath:path}")
+async def serve_waveform_file(session_id: str, subpath: str):
+    """
+    Serve waveform analysis files (plots, CSVs, MSEED).
+    
+    Args:
+        session_id: Session/temp directory ID
+        subpath: Relative path within session directory (e.g., 'plots/shakemap.png')
+        
+    Returns:
+        File response with appropriate content type
+    """
+    import tempfile
+    import mimetypes
+    
+    # Construct full path
+    base_path = os.path.join(tempfile.gettempdir(), f"sweet_waveforms_{session_id}")
+    file_path = os.path.join(base_path, subpath)
+    
+    # Security: ensure path is within base_path (prevent directory traversal)
+    file_path = os.path.abspath(file_path)
+    base_path = os.path.abspath(base_path)
+    
+    if not file_path.startswith(base_path):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"File not found: {subpath}")
+    
+    # Determine content type
+    content_type, _ = mimetypes.guess_type(file_path)
+    if content_type is None:
+        content_type = 'application/octet-stream'
+    
+    return FileResponse(
+        file_path,
+        media_type=content_type,
+        filename=os.path.basename(file_path)
+    )
 
 
 @app.get("/api/waveforms/download/{filename}")

@@ -3062,21 +3062,40 @@
             const dataLinks = document.getElementById('data-links');
             dataLinks.innerHTML = '';
             
-            // Statistics JSON
-            const statsLink = document.createElement('a');
-            statsLink.href = currentAnalysisResult.data.statistics;
-            statsLink.className = 'block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm text-center';
-            statsLink.textContent = '📊 Statistics (JSON)';
-            statsLink.download = 'statistics.json';
-            dataLinks.appendChild(statsLink);
+            // Statistics CSV
+            if (currentAnalysisResult.data.statistics_csv) {
+                const statsLink = document.createElement('a');
+                statsLink.href = currentAnalysisResult.data.statistics_csv;
+                statsLink.className = 'block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm text-center font-medium';
+                statsLink.innerHTML = '<i class="fas fa-table mr-2"></i>Statistics (CSV)';
+                statsLink.download = 'statistics.csv';
+                dataLinks.appendChild(statsLink);
+            }
             
             // Detailed CSV
-            const csvLink = document.createElement('a');
-            csvLink.href = currentAnalysisResult.data.detailed_csv;
-            csvLink.className = 'block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm text-center mt-2';
-            csvLink.textContent = '📈 Detailed Analysis (CSV)';
-            csvLink.download = 'waveform_analysis.csv';
-            dataLinks.appendChild(csvLink);
+            if (currentAnalysisResult.data.detailed_csv) {
+                const csvLink = document.createElement('a');
+                csvLink.href = currentAnalysisResult.data.detailed_csv;
+                csvLink.className = 'block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm text-center font-medium mt-2';
+                csvLink.innerHTML = '<i class="fas fa-chart-line mr-2"></i>Detailed Analysis (CSV)';
+                csvLink.download = 'waveform_analysis.csv';
+                dataLinks.appendChild(csvLink);
+            }
+            
+            // Statistics JSON (from result.data.statistics object)
+            const statsJsonBtn = document.createElement('button');
+            statsJsonBtn.className = 'block w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm text-center font-medium mt-2';
+            statsJsonBtn.innerHTML = '<i class="fas fa-code mr-2"></i>Statistics (JSON)';
+            statsJsonBtn.onclick = () => {
+                const blob = new Blob([JSON.stringify(currentAnalysisResult.statistics, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'statistics.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+            dataLinks.appendChild(statsJsonBtn);
             
             // Display plots inline
             displayWaveformPlots();
@@ -3105,23 +3124,25 @@
                 plotCard.className = 'bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition';
                 
                 const title = document.createElement('div');
-                title.className = 'px-4 py-3 bg-gradient-to-r from-purple-50 to-purple-100 font-semibold text-gray-800';
-                title.textContent = plotNames[key] || key;
+                title.className = 'px-4 py-3 bg-gradient-to-r from-purple-50 to-purple-100 font-semibold text-gray-800 flex justify-between items-center';
+                const titleText = document.createElement('span');
+                titleText.textContent = plotNames[key] || key;
+                title.appendChild(titleText);
                 
                 const imgContainer = document.createElement('div');
                 imgContainer.className = 'p-2 bg-gray-50';
                 
                 const img = document.createElement('img');
-                img.src = `file://${path}`;
+                img.src = path;  // path is now an HTTP URL
                 img.alt = plotNames[key];
-                img.className = 'w-full h-auto cursor-pointer';
-                img.onclick = () => openPlotModal(path);
+                img.className = 'w-full h-auto cursor-pointer hover:opacity-90 transition';
+                img.onclick = () => openPlotModal(path, plotNames[key]);
                 
                 const downloadBtn = document.createElement('a');
                 downloadBtn.href = path;
                 downloadBtn.download = `${key}.png`;
-                downloadBtn.className = 'block mt-2 px-4 py-2 bg-purple-600 text-white text-center rounded hover:bg-purple-700 transition text-sm';
-                downloadBtn.textContent = '⬇️ Download Plot';
+                downloadBtn.className = 'block mt-2 px-4 py-2 bg-purple-600 text-white text-center rounded hover:bg-purple-700 transition text-sm font-medium';
+                downloadBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Download Plot';
                 
                 imgContainer.appendChild(img);
                 plotCard.appendChild(title);
@@ -3134,8 +3155,12 @@
         }
         
         // Open plot in modal/new window
-        function openPlotModal(imagePath) {
-            window.open(imagePath, '_blank', 'width=1200,height=900');
+        function openPlotModal(imagePath, plotTitle = 'Plot') {
+            // Open in new tab with better sizing
+            const newWindow = window.open(imagePath, '_blank');
+            if (newWindow) {
+                newWindow.document.title = plotTitle;
+            }
         }
         
         // Prepare subsources data for API
