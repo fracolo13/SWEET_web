@@ -380,13 +380,23 @@ async def sum_waveforms_endpoint(params: WaveformSummationInput):
         
         # Resolve templates directory (handle relative paths)
         templates_dir = params.templates_dir
-        if not os.path.isabs(templates_dir):
-            # Convert relative path to absolute (relative to workspace root)
-            templates_dir = str(Path(__file__).parent / templates_dir)
         
-        if not os.path.isdir(templates_dir):
-            raise HTTPException(status_code=400, 
-                              detail=f"Templates directory not found: {templates_dir}")
+        # Check if S3 mode is enabled
+        use_s3 = os.getenv('USE_S3_TEMPLATES', 'false').lower() == 'true'
+        
+        if use_s3:
+            logger.info("Using S3 for template storage")
+            # In S3 mode, templates_dir is just a prefix/path in the bucket
+            # No need to check if local directory exists
+        else:
+            # Local mode: resolve and validate directory
+            if not os.path.isabs(templates_dir):
+                # Convert relative path to absolute (relative to workspace root)
+                templates_dir = str(Path(__file__).parent / templates_dir)
+            
+            if not os.path.isdir(templates_dir):
+                raise HTTPException(status_code=400, 
+                                  detail=f"Templates directory not found: {templates_dir}")
         
         # Create output directory (use temp dir on server)
         output_dir = tempfile.mkdtemp(prefix="sweet_waveforms_")
@@ -426,8 +436,10 @@ async def sum_waveforms_endpoint(params: WaveformSummationInput):
         )
         
     except Exception as e:
-        logger.error(f"Error in waveform summation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error in waveform summation: {e}", exc_info=True)
+        import traceback
+        error_detail = f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 @app.post("/api/waveforms/analyze")
