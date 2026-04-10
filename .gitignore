@@ -34,3 +34,19 @@ htmlcov/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Templates (116GB - stored in S3)
+SWEET_scripts/DATA/processed_templates/
+SWEET_scripts/DATA/templates_demo/
+
+# S3 upload logs
+s3_upload.log
+nohup.out
+
+# AWS credentials (never commit!)
+.aws/
+s3_config.sh
+
+# Waveform outputs
+**/sweet_waveforms_*/
+*.mseed

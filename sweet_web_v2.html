@@ -65,6 +65,11 @@
                             <div class="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold">4</div>
                             <span class="ml-2 text-sm font-medium text-white/50">Spatial Setup</span>
                         </div>
+                        <div class="mx-2 text-white/50">→</div>
+                        <div id="step-5" class="flex items-center">
+                            <div class="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold">5</div>
+                            <span class="ml-2 text-sm font-medium text-white/50">Waveforms</span>
+                        </div>
                     </div>
                 </div>
                 <!-- About Button -->
@@ -474,6 +479,89 @@
                             </div>
                         </div>
                         
+                        <!-- Waveform Computation Section -->
+                        <div id="waveform-config" class="mb-6 hidden">
+                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-wave-square mr-2 text-purple-500"></i>
+                                Waveform Configuration
+                            </h4>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Templates Directory</label>
+                                <input type="text" id="templates-dir" value="SWEET_scripts/DATA/processed_templates" class="w-full px-3 py-2 border border-gray-300 rounded text-xs">
+                                <p class="text-xs text-gray-500 mt-1">Relative to workspace root, or absolute path</p>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Number of Realizations: <span id="n-realizations-value" class="text-blue-600 font-semibold">1</span>
+                                </label>
+                                <input type="range" id="n-realizations" min="1" max="10" step="1" value="1" class="w-full" oninput="document.getElementById('n-realizations-value').textContent = this.value">
+                            </div>
+                            
+                            <button onclick="computeWaveforms()" class="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition shadow-lg">
+                                <i class="fas fa-calculator mr-2"></i>Compute Waveforms
+                            </button>
+                        </div>
+                        
+                        </div>
+                    </div>
+                    
+                    <!-- Waveform Results Panel -->
+                    <div id="waveforms-panel" class="transition-transform duration-500 ease-in-out absolute top-0 left-0 w-full overflow-y-auto" style="transform: translateX(100%); height: 100%;">
+                        <div class="p-6">
+                        
+                        <div class="mb-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center">
+                                <i class="fas fa-wave-square mr-3 text-purple-600"></i>
+                                Waveform Results
+                            </h3>
+                            <p class="text-sm text-gray-600">Analysis and downloads</p>
+                        </div>
+                        
+                        <!-- Status Message -->
+                        <div id="waveform-status" class="mb-4 hidden"></div>
+                        
+                        <!-- Statistics Grid -->
+                        <div id="waveform-stats" class="grid grid-cols-2 gap-4 mb-6 hidden">
+                            <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg">
+                                <div class="text-xs text-gray-600 mb-1">MAGNITUDE</div>
+                                <div id="result-magnitude" class="text-2xl font-bold text-blue-600">-</div>
+                            </div>
+                            <div class="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg">
+                                <div class="text-xs text-gray-600 mb-1">STATIONS</div>
+                                <div id="result-stations" class="text-2xl font-bold text-green-600">-</div>
+                            </div>
+                            <div class="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg">
+                                <div class="text-xs text-gray-600 mb-1">MAX PGA</div>
+                                <div id="result-max-pga" class="text-2xl font-bold text-orange-600">-</div>
+                            </div>
+                            <div class="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg">
+                                <div class="text-xs text-gray-600 mb-1">MAX PGV</div>
+                                <div id="result-max-pgv" class="text-2xl font-bold text-purple-600">-</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Downloads Section -->
+                        <div id="waveform-downloads" class="hidden">
+                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-download mr-2 text-green-500"></i>
+                                Downloads
+                            </h4>
+                            
+                            <div class="space-y-3">
+                                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                    <h5 class="text-sm font-semibold text-gray-700 mb-3">Waveform Data</h5>
+                                    <div id="mseed-links" class="space-y-2"></div>
+                                </div>
+                                
+                                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                    <h5 class="text-sm font-semibold text-gray-700 mb-3">Analysis Data</h5>
+                                    <div id="data-links" class="space-y-2"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         </div>
                     </div>
                     
@@ -549,6 +637,9 @@
                     </button>
                     <button id="proceed-network-btn" onclick="proceedToSpatialSetup()" class="px-6 py-2.5 bg-green-600 text-white hover:bg-green-500 rounded-lg transition flex items-center font-semibold shadow-md hidden">
                         Spatial Setup<i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                    <button id="view-waveforms-btn" onclick="viewWaveformResults()" class="px-6 py-2.5 bg-purple-600 text-white hover:bg-purple-500 rounded-lg transition flex items-center font-semibold shadow-md hidden">
+                        <i class="fas fa-chart-line mr-2"></i>View Results
                     </button>
                 </div>
                 <div class="text-sm text-gray-300">
@@ -1489,6 +1580,9 @@
         
         // Display stations in list
         function displayStations(stations) {
+            // Store stations globally for API
+            window.stationsData = stations;
+            
             const stationList = document.getElementById('station-list');
             const stationCount = document.getElementById('station-count');
             const stationItems = document.getElementById('station-items');
@@ -1524,6 +1618,8 @@
             }
             
             stationList.classList.remove('hidden');
+            // Show waveform configuration section now that stations are loaded
+            document.getElementById('waveform-config').classList.remove('hidden');
         }
         
         // Update visualization based on dropdown selection
@@ -1544,10 +1640,21 @@
         // Back to geometry panel
         function backToGeometry() {
             // Check which panel is currently visible
+            const waveformsVisible = document.getElementById('waveforms-panel').style.transform === 'translateX(0px)';
             const spatialVisible = document.getElementById('spatial-panel').style.transform === 'translateX(0px)';
             const subsourcesVisible = document.getElementById('subsources-panel').style.transform === 'translateX(0px)';
             
-            if (spatialVisible) {
+            if (waveformsVisible) {
+                // Go back to spatial from waveforms
+                document.getElementById('waveforms-panel').style.transform = 'translateX(100%)';
+                document.getElementById('spatial-panel').style.transform = 'translateX(0)';
+                
+                // Update button text
+                document.getElementById('back-button-text').textContent = 'Back to Subsources';
+                
+                // Update progress back to step 4
+                updateProgressSteps(4);
+            } else if (spatialVisible) {
                 // Go back to subsources from spatial
                 document.getElementById('spatial-panel').style.transform = 'translateX(100%)';
                 document.getElementById('subsources-panel').style.transform = 'translateX(0)';
@@ -1624,6 +1731,7 @@
             document.getElementById('kinematics-panel').style.transform = 'translateX(100%)';
             document.getElementById('subsources-panel').style.transform = 'translateX(100%)';
             document.getElementById('spatial-panel').style.transform = 'translateX(100%)';
+            document.getElementById('waveforms-panel').style.transform = 'translateX(100%)';
             
             // Hide footer buttons
             document.getElementById('confirm-geometry-btn').classList.add('hidden');
@@ -2712,6 +2820,316 @@
                 closeAbout();
             }
         });
+
+        // ============================================================================
+        // WAVEFORM COMPUTATION FUNCTIONS
+        // ============================================================================
+        
+        let currentWaveformResult = null;
+        let currentAnalysisResult = null;
+        
+        // Compute waveforms
+        async function computeWaveforms() {
+            try {
+                showWaveformStatus('Computing waveforms...', 'progress');
+                
+                // Get configuration
+                const templatesDir = document.getElementById('templates-dir').value;
+                const nRealizations = parseInt(document.getElementById('n-realizations').value);
+                
+                // Prepare subsources data
+                const subsources = prepareSubsourcesForAPI();
+                
+                // Prepare stations data
+                const stations = prepareStationsForAPI();
+                
+                if (!stations || stations.length === 0) {
+                    showWaveformStatus('Please generate or load stations first!', 'error');
+                    return;
+                }
+                
+                console.log('Computing waveforms with:', {
+                    subsources: subsources.length,
+                    stations: stations.length,
+                    templatesDir,
+                    nRealizations
+                });
+                
+                // Call API to sum waveforms
+                const sumResponse = await fetch('/api/waveforms/sum', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        subsources: subsources,
+                        stations: stations,
+                        templates_dir: templatesDir,
+                        n_realizations: nRealizations,
+                        sampling_rate: 100.0,
+                        moment_scale: false,
+                        amplitude_scale: 1.0,
+                        min_template_dist_km: 10.0
+                    })
+                });
+                
+                if (!sumResponse.ok) {
+                    const error = await sumResponse.text();
+                    throw new Error(`Waveform summation failed: ${error}`);
+                }
+                
+                currentWaveformResult = await sumResponse.json();
+                
+                console.log('Waveforms computed:', currentWaveformResult);
+                
+                showWaveformStatus('Analyzing waveforms and generating plots...', 'progress');
+                
+                // Call API to analyze waveforms
+                const analysisResponse = await fetch('/api/waveforms/analyze', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        mseed_file: currentWaveformResult.output_files[0],
+                        subsources: subsources,
+                        stations: stations,
+                        title_prefix: `Mw ${globalKinematicsResult.computed_mw.toFixed(1)} Event`
+                    })
+                });
+                
+                if (!analysisResponse.ok) {
+                    const error = await analysisResponse.text();
+                    throw new Error(`Waveform analysis failed: ${error}`);
+                }
+                
+                currentAnalysisResult = await analysisResponse.json();
+                
+                console.log('Analysis complete:', currentAnalysisResult);
+                
+                // Show success message
+                showWaveformStatus(
+                    `✅ Complete! Generated ${currentWaveformResult.realizations_generated} realizations for ${currentWaveformResult.stations_with_templates} stations.`,
+                    'success'
+                );
+                
+                // Show View Results button
+                document.getElementById('view-waveforms-btn').classList.remove('hidden');
+                
+                // Auto-show results after 2 seconds
+                setTimeout(() => {
+                    viewWaveformResults();
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Error computing waveforms:', error);
+                showWaveformStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // View waveform results
+        function viewWaveformResults() {
+            if (!currentAnalysisResult) {
+                alert('No waveform results available. Please compute waveforms first.');
+                return;
+            }
+            
+            // Slide to waveforms panel
+            document.getElementById('spatial-panel').style.transform = 'translateX(-100%)';
+            document.getElementById('waveforms-panel').style.transform = 'translateX(0)';
+            
+            // Hide view button, update back button
+            document.getElementById('view-waveforms-btn').classList.add('hidden');
+            document.getElementById('back-button-text').textContent = 'Back to Spatial Setup';
+            
+            // Update progress to step 5
+            updateProgressSteps(5);
+            
+            // Display results
+            displayWaveformResults();
+        }
+        
+        // Display waveform results
+        function displayWaveformResults() {
+            const stats = currentAnalysisResult.statistics;
+            
+            // Show stats grid
+            document.getElementById('waveform-stats').classList.remove('hidden');
+            
+            // Update statistics
+            document.getElementById('result-magnitude').textContent = 
+                stats.magnitude ? `Mw ${stats.magnitude.toFixed(1)}` : '-';
+            document.getElementById('result-stations').textContent = stats.num_stations;
+            document.getElementById('result-max-pga').innerHTML = 
+                `${stats.pga_max.toFixed(3)}<span class="text-sm ml-1">m/s²</span>`;
+            document.getElementById('result-max-pgv').innerHTML = 
+                `${stats.pgv_max.toFixed(4)}<span class="text-sm ml-1">m/s</span>`;
+            
+            // Show downloads section
+            document.getElementById('waveform-downloads').classList.remove('hidden');
+            
+            // Create download links for MSEED files
+            const mseedLinks = document.getElementById('mseed-links');
+            mseedLinks.innerHTML = '';
+            currentWaveformResult.output_files.forEach((file, idx) => {
+                const filename = file.split('/').pop();
+                const link = document.createElement('a');
+                link.href = `/api/waveforms/download/${filename}`;
+                link.className = 'block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm text-center';
+                link.textContent = `📁 Realization ${idx + 1} (MSEED)`;
+                link.download = filename;
+                mseedLinks.appendChild(link);
+            });
+            
+            // Create download links for data files
+            const dataLinks = document.getElementById('data-links');
+            dataLinks.innerHTML = '';
+            
+            // Statistics JSON
+            const statsLink = document.createElement('a');
+            statsLink.href = currentAnalysisResult.data.statistics;
+            statsLink.className = 'block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm text-center';
+            statsLink.textContent = '📊 Statistics (JSON)';
+            statsLink.download = 'statistics.json';
+            dataLinks.appendChild(statsLink);
+            
+            // Detailed CSV
+            const csvLink = document.createElement('a');
+            csvLink.href = currentAnalysisResult.data.detailed_csv;
+            csvLink.className = 'block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm text-center mt-2';
+            csvLink.textContent = '📈 Detailed Analysis (CSV)';
+            csvLink.download = 'waveform_analysis.csv';
+            dataLinks.appendChild(csvLink);
+            
+            // Display plots inline
+            displayWaveformPlots();
+        }
+        
+        // Display waveform plots
+        function displayWaveformPlots() {
+            const plotContainer = document.getElementById('plot-container');
+            plotContainer.innerHTML = '';
+            plotContainer.style.backgroundColor = '#ffffff';
+            
+            // Create gallery of plots
+            const plots = currentAnalysisResult.plots;
+            const plotNames = {
+                'shakemap': 'PGA Shakemap',
+                'pga_vs_distance': 'PGA vs Distance',
+                'pgv_vs_distance': 'PGV vs Distance',
+                'waveform_overview': 'Waveform Overview'
+            };
+            
+            const gallery = document.createElement('div');
+            gallery.className = 'grid grid-cols-1 lg:grid-cols-2 gap-4 p-4';
+            
+            for (const [key, path] of Object.entries(plots)) {
+                const plotCard = document.createElement('div');
+                plotCard.className = 'bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition';
+                
+                const title = document.createElement('div');
+                title.className = 'px-4 py-3 bg-gradient-to-r from-purple-50 to-purple-100 font-semibold text-gray-800';
+                title.textContent = plotNames[key] || key;
+                
+                const imgContainer = document.createElement('div');
+                imgContainer.className = 'p-2 bg-gray-50';
+                
+                const img = document.createElement('img');
+                img.src = `file://${path}`;
+                img.alt = plotNames[key];
+                img.className = 'w-full h-auto cursor-pointer';
+                img.onclick = () => openPlotModal(path);
+                
+                const downloadBtn = document.createElement('a');
+                downloadBtn.href = path;
+                downloadBtn.download = `${key}.png`;
+                downloadBtn.className = 'block mt-2 px-4 py-2 bg-purple-600 text-white text-center rounded hover:bg-purple-700 transition text-sm';
+                downloadBtn.textContent = '⬇️ Download Plot';
+                
+                imgContainer.appendChild(img);
+                plotCard.appendChild(title);
+                plotCard.appendChild(imgContainer);
+                plotCard.appendChild(downloadBtn);
+                gallery.appendChild(plotCard);
+            }
+            
+            plotContainer.appendChild(gallery);
+        }
+        
+        // Open plot in modal/new window
+        function openPlotModal(imagePath) {
+            window.open(imagePath, '_blank', 'width=1200,height=900');
+        }
+        
+        // Prepare subsources data for API
+        function prepareSubsourcesForAPI() {
+            const subsources = [];
+            
+            for (const [groupKey, patchIndices] of Object.entries(currentGrouping.groups)) {
+                const groupNum = parseInt(groupKey);
+                let totalMoment = 0;
+                let totalTrup = 0;
+                let sumLon = 0;
+                let sumLat = 0;
+                let sumDepth = 0;
+                let count = 0;
+                
+                for (const [i, j] of patchIndices) {
+                    const patchIdx = i * globalKinematicsResult.n_down + j;
+                    const patch = globalKinematicsResult.patches[patchIdx];
+                    
+                    totalMoment += patch.moment;
+                    totalTrup += patch.rupture_time;
+                    sumLon += patch.centroid_lon;
+                    sumLat += patch.centroid_lat;
+                    sumDepth += patch.depth;
+                    count++;
+                }
+                
+                subsources.push({
+                    centroid_lon: sumLon / count,
+                    centroid_lat: sumLat / count,
+                    centroid_depth: sumDepth / count,
+                    sf_moment: totalMoment,
+                    trup: totalTrup / count,
+                    magnitude: (2.0 / 3.0) * (Math.log10(totalMoment) - 9.1),
+                    rise: 1.0,
+                    slip: 1.0
+                });
+            }
+            
+            return subsources;
+        }
+        
+        // Prepare stations data for API
+        function prepareStationsForAPI() {
+            // Get stations from the global stationsData or create from display
+            if (!window.stationsData || window.stationsData.length === 0) {
+                console.warn('No stations data available');
+                return [];
+            }
+            
+            return window.stationsData.map(sta => ({
+                station_code: sta.station_code || sta.name,
+                name: sta.name,
+                latitude: sta.lat,
+                longitude: sta.lon,
+                vs30: sta.vs30 || 500.0,
+                network: sta.network || 'XX'
+            }));
+        }
+        
+        // Show waveform status message
+        function showWaveformStatus(message, type) {
+            const statusEl = document.getElementById('waveform-status');
+            statusEl.classList.remove('hidden');
+            
+            const colors = {
+                'progress': 'bg-blue-100 border-blue-500 text-blue-800',
+                'success': 'bg-green-100 border-green-500 text-green-800',
+                'error': 'bg-red-100 border-red-500 text-red-800'
+            };
+            
+            statusEl.className = `mb-4 p-4 rounded-lg border-l-4 ${colors[type]}`;
+            statusEl.textContent = message;
+        }
+        
     </script>
 
 </body>

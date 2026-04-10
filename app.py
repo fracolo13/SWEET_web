@@ -5,15 +5,18 @@ Handles fault discretization, kinematics, and subsource grouping
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pathlib import Path
 import logging
 import numpy as np
+import os
+from typing import List, Dict
 
 from models.geometry import GeometryInput, FaultGeometry
 from models.kinematics import KinematicsInput, FaultKinematics
 from models.subsources import SubsourceInput, SubsourceResult
 from models.geojson import GeoJSONFaultModel
+from models.waveforms import WaveformSummationInput, WaveformSummationResult
 from services.geometry_service import generate_fault_geometry
 from services.kinematics_service import generate_fault_kinematics
 from services.grouping_service import compute_subsource_groups
@@ -328,6 +331,264 @@ async def group_subsources(
     except Exception as e:
         logger.error(f"Error grouping subsources: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========================================
+# WAVEFORM SUMMATION ENDPOINTS
+# ========================================
+
+@app.post("/api/waveforms/sum", response_model=WaveformSummationResult)
+async def sum_waveforms_endpoint(params: WaveformSummationInput):
+    """
+    Sum synthetic waveforms from subsources and stations.
+    
+    This endpoint handles:
+    - Loading subsource and station data from the web interface
+    - Matching each subsource-station pair to appropriate templates
+    - Time-shifting templates by rupture time
+    - Summing contributions for each station
+    - Generating MSEED output files
+    
+    Args:
+        params: Waveform summation parameters including subsources, stations, and config
+        
+    Returns:
+        Summation result with statistics and output file paths
+    """
+    try:
+        import sys
+        import os
+        import tempfile
+        from pathlib import Path
+        
+        # Add summing scripts to path
+        summing_dir = Path(__file__).parent / "SWEET_scripts" / "summing"
+        sys.path.insert(0, str(summing_dir))
+        
+        from sum_from_web_input import (
+            load_subsources_from_json,
+            load_stations_from_json,
+            sum_waveforms
+        )
+        
+        logger.info(f"Starting waveform summation: {len(params.subsources)} subsources, "
+                   f"{len(params.stations)} stations")
+        
+        # Load and normalize data
+        subsources = load_subsources_from_json(params.subsources)
+        stations = load_stations_from_json(params.stations)
+        
+        # Resolve templates directory (handle relative paths)
+        templates_dir = params.templates_dir
+        if not os.path.isabs(templates_dir):
+            # Convert relative path to absolute (relative to workspace root)
+            templates_dir = str(Path(__file__).parent / templates_dir)
+        
+        if not os.path.isdir(templates_dir):
+            raise HTTPException(status_code=400, 
+                              detail=f"Templates directory not found: {templates_dir}")
+        
+        # Create output directory (use temp dir on server)
+        output_dir = tempfile.mkdtemp(prefix="sweet_waveforms_")
+        
+        # Sum waveforms
+        stats = sum_waveforms(
+            subsources=subsources,
+            stations=stations,
+            templates_dir=templates_dir,
+            output_dir=output_dir,
+            n_realizations=params.n_realizations,
+            sampling_rate=params.sampling_rate,
+            moment_scale=params.moment_scale,
+            amplitude_scale=params.amplitude_scale,
+            min_template_dist_km=params.min_template_dist_km
+        )
+        
+        # Get output files
+        output_files = [
+            os.path.join(output_dir, f"summed_realization_{i+1:02d}.mseed")
+            for i in range(params.n_realizations)
+        ]
+        
+        logger.info(f"Waveform summation complete: {stats['realizations_generated']} "
+                   f"realizations, {len(stats['stations_ok'])} stations")
+        
+        return WaveformSummationResult(
+            num_subsources=stats['num_subsources'],
+            num_stations=stats['num_stations'],
+            stations_with_templates=len(stats['stations_ok']),
+            stations_missing_templates=len(stats['stations_missing']),
+            realizations_generated=stats['realizations_generated'],
+            output_files=output_files,
+            success=True,
+            message=f"Generated {stats['realizations_generated']} realizations "
+                   f"for {len(stats['stations_ok'])} stations"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in waveform summation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/waveforms/analyze")
+async def analyze_waveforms_endpoint(
+    mseed_file: str,
+    subsources: List[Dict],
+    stations: List[Dict],
+    title_prefix: str = "Synthetic Event"
+):
+    """
+    Analyze waveforms and generate plots.
+    
+    This endpoint handles:
+    - Extracting PGA, PGV, duration statistics
+    - Generating waveform overview plots
+    - Creating PGA/PGV vs distance plots
+    - Generating shakemap
+    - Exporting statistics and detailed CSV
+    
+    Args:
+        mseed_file: Path to MSEED file to analyze
+        subsources: Subsource data for fault outline
+        stations: Station data
+        title_prefix: Prefix for plot titles
+        
+    Returns:
+        Dictionary with plot paths, statistics, and data files
+    """
+    try:
+        import sys
+        from pathlib import Path
+        
+        # Add summing scripts to path
+        summing_dir = Path(__file__).parent / "SWEET_scripts" / "summing"
+        sys.path.insert(0, str(summing_dir))
+        
+        from analyze_from_web import generate_all_plots
+        
+        logger.info(f"Analyzing waveforms from {mseed_file}")
+        
+        if not os.path.exists(mseed_file):
+            raise HTTPException(status_code=404, detail=f"MSEED file not found: {mseed_file}")
+        
+        # Create output directory
+        output_dir = os.path.join(os.path.dirname(mseed_file), 'plots')
+        
+        # Generate all plots and analysis
+        result = generate_all_plots(
+            mseed_file=mseed_file,
+            stations=stations,
+            subsources=subsources,
+            output_dir=output_dir,
+            title_prefix=title_prefix
+        )
+        
+        logger.info(f"Analysis complete: {result['statistics']['num_stations']} stations analyzed")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error analyzing waveforms: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/waveforms/download/{filename}")
+async def download_waveform_file(filename: str):
+    """
+    Download a waveform MSEED file.
+    
+    Args:
+        filename: Name of the file (e.g., 'summed_realization_01.mseed')
+        
+    Returns:
+        File download response
+    """
+    # This is a simplified version - in production, you'd want to:
+    # 1. Validate the filename
+    # 2. Check user permissions
+    # 3. Track the file path properly
+    
+    # For now, we'll look in a temp directory
+    # In practice, you'd get this from a session or database
+    import tempfile
+    temp_dirs = [d for d in os.listdir(tempfile.gettempdir()) 
+                 if d.startswith('sweet_waveforms_')]
+    
+    if not temp_dirs:
+        raise HTTPException(status_code=404, detail="No waveform files found")
+    
+    # Search for the file
+    for temp_dir in temp_dirs:
+        file_path = os.path.join(tempfile.gettempdir(), temp_dir, filename)
+        if os.path.exists(file_path):
+            return FileResponse(
+                file_path,
+                media_type='application/octet-stream',
+                filename=filename
+            )
+    
+    raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+
+
+@app.get("/api/waveforms/download-plot/{plot_type}")
+async def download_plot(plot_type: str, result_dir: str):
+    """
+    Download a plot image.
+    
+    Args:
+        plot_type: Type of plot ('waveform_overview', 'pga_vs_distance', 
+                   'pgv_vs_distance', 'shakemap')
+        result_dir: Directory containing the plots
+        
+    Returns:
+        Image file download response
+    """
+    plot_files = {
+        'waveform_overview': 'waveform_overview.png',
+        'pga_vs_distance': 'pga_vs_distance.png',
+        'pgv_vs_distance': 'pgv_vs_distance.png',
+        'shakemap': 'shakemap.png'
+    }
+    
+    if plot_type not in plot_files:
+        raise HTTPException(status_code=400, 
+                          detail=f"Invalid plot type. Choose from: {list(plot_files.keys())}")
+    
+    file_path = os.path.join(result_dir, plot_files[plot_type])
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, 
+                          detail=f"Plot not found: {plot_files[plot_type]}")
+    
+    return FileResponse(
+        file_path,
+        media_type='image/png',
+        filename=plot_files[plot_type]
+    )
+
+
+@app.get("/api/waveforms/statistics")
+async def get_waveform_statistics(result_dir: str):
+    """
+    Get waveform analysis statistics.
+    
+    Args:
+        result_dir: Directory containing the analysis results
+        
+    Returns:
+        Statistics dictionary
+    """
+    import json
+    
+    stats_file = os.path.join(result_dir, 'statistics.json')
+    
+    if not os.path.exists(stats_file):
+        raise HTTPException(status_code=404, detail="Statistics file not found")
+    
+    with open(stats_file, 'r') as f:
+        stats = json.load(f)
+    
+    return stats
 
 
 # ========================================
