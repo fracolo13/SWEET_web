@@ -1030,6 +1030,42 @@
         function updateSubsourceGrouping() {
             if (!faultData) return;
             
+            // Handle GeoJSON mode - subsources are already defined
+            if (window.isGeoJSONMode && window.geojsonSubsources) {
+                const subsources = window.geojsonSubsources;
+                
+                // Calculate magnitudes for each subsource
+                const subsourceMagnitudes = subsources.map(s => {
+                    return (2.0 / 3.0) * (Math.log10(s.sf_moment) - 9.1);
+                });
+                
+                // Update display
+                document.getElementById('total-patches').textContent = window.geojsonPatches.length;
+                document.getElementById('selected-patches').textContent = subsources.length;
+                document.getElementById('subsource-coverage').textContent = (window.geojsonPatches.length / subsources.length).toFixed(1);
+                
+                // Disable grouping slider for GeoJSON (subsources are pre-defined)
+                document.getElementById('subsource-magnitude').disabled = true;
+                document.getElementById('subsource-magnitude').classList.add('opacity-50', 'cursor-not-allowed');
+                
+                // Add informational message
+                const infoMsg = document.createElement('p');
+                infoMsg.className = 'text-xs text-blue-600 mt-1';
+                infoMsg.id = 'geojson-info-msg';
+                infoMsg.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Subsources are pre-defined in the GeoJSON file';
+                const sliderContainer = document.getElementById('subsource-magnitude').parentElement;
+                if (!document.getElementById('geojson-info-msg')) {
+                    sliderContainer.appendChild(infoMsg);
+                }
+                
+                // Update visualization and histogram
+                visualizeSubsources();
+                plotMagnitudeHistogram(subsourceMagnitudes);
+                
+                return;
+            }
+            
+            // Synthetic fault mode (original logic)
             const subsourceMag = parseFloat(document.getElementById('subsource-magnitude').value);
             document.getElementById('subsource-mag-value').textContent = subsourceMag.toFixed(1);
             
@@ -1114,6 +1150,46 @@
         function visualizeSubsources() {
             if (!faultData) return;
             
+            // Handle GeoJSON mode - show 3D visualization with subsources color-coded
+            if (window.isGeoJSONMode && window.geojsonPatches) {
+                const patches = window.geojsonPatches;
+                const subsources = window.geojsonSubsources;
+                
+                // Create visualization showing slip distribution
+                const trace = {
+                    x: patches.map(p => p.centroid_lon),
+                    y: patches.map(p => p.centroid_lat),
+                    z: patches.map(p => p.depth),
+                    mode: 'markers',
+                    type: 'scatter3d',
+                    marker: {
+                        size: 6,
+                        color: patches.map(p => p.slip),
+                        colorscale: 'Jet',
+                        showscale: true,
+                        colorbar: {title: 'Slip (m)'}
+                    },
+                    text: patches.map(p => `Slip: ${p.slip.toFixed(2)} m<br>Moment: ${p.moment.toExponential(2)} N·m<br>Lon: ${p.centroid_lon.toFixed(4)}°<br>Lat: ${p.centroid_lat.toFixed(4)}°<br>Depth: ${p.depth.toFixed(1)} km`),
+                    hoverinfo: 'text',
+                    name: 'Fault Patches'
+                };
+                
+                const layout = {
+                    title: `Fault Subsources - ${subsources.length} subsources from ${patches.length} patches`,
+                    scene: {
+                        xaxis: {title: 'Longitude (°)'},
+                        yaxis: {title: 'Latitude (°)'},
+                        zaxis: {title: 'Depth (km)', autorange: 'reversed'}
+                    },
+                    margin: {l: 0, r: 0, t: 40, b: 0},
+                    height: 600
+                };
+                
+                Plotly.newPlot('plot-container', [trace], layout);
+                return;
+            }
+            
+            // Synthetic fault mode (original 2D grid logic)
             // Create 2D grid for fault patches with actual dimensions in km
             const patchLength = faultData.length / faultData.nAlong;
             const patchWidth = faultData.width / faultData.nDown;
@@ -1725,17 +1801,26 @@
             
             // Add fault trace
             if (window.isGeoJSONMode && window.geojsonPatches) {
-                // Use GeoJSON fault geometry
-                const patchLons = window.geojsonPatches.map(p => p.centroid_lon);
-                const patchLats = window.geojsonPatches.map(p => p.centroid_lat);
-                const patchSlip = window.geojsonPatches.map(p => p.slip);
+                // Use GeoJSON fault geometry - show actual rupture with slip distribution
+                const patches = window.geojsonPatches;
+                const patchLons = patches.map(p => p.centroid_lon);
+                const patchLats = patches.map(p => p.centroid_lat);
+                const patchSlip = patches.map(p => p.slip);
+                const patchMoment = patches.map(p => p.moment);
                 
-                // Create fault patch markers with colors based on slip
+                // Create slip distribution trace - main rupture visualization
                 const maxSlip = Math.max(...patchSlip);
-                const colors = patchSlip.map(slip => {
-                    const intensity = Math.min(slip / maxSlip, 1.0);
-                    return `rgba(255, ${Math.floor((1 - intensity) * 100)}, 0, 0.7)`;
-                });
+                const minSlip = Math.min(...patchSlip.filter(s => s > 0));
+                
+                // Create hover text with detailed patch information
+                const patchHoverText = patches.map(p => 
+                    `Slip: ${p.slip.toFixed(3)} m<br>` +
+                    `Moment: ${p.moment.toExponential(2)} N·m<br>` +
+                    `Lat: ${p.centroid_lat.toFixed(4)}°<br>` +
+                    `Lon: ${p.centroid_lon.toFixed(4)}°<br>` +
+                    `Depth: ${p.depth.toFixed(1)} km<br>` +
+                    `Rupture Time: ${p.rupture_time.toFixed(2)} s`
+                );
                 
                 traces.push({
                     type: 'scattermapbox',
@@ -1743,19 +1828,58 @@
                     lon: patchLons,
                     lat: patchLats,
                     marker: {
-                        size: 8,
+                        size: 12,
                         color: patchSlip,
                         colorscale: 'Hot',
+                        cmin: 0,
+                        cmax: maxSlip,
                         showscale: true,
                         colorbar: {
-                            title: 'Slip (m)',
-                            x: 1.02
+                            title: {
+                                text: 'Slip (m)',
+                                side: 'right'
+                            },
+                            thickness: 15,
+                            len: 0.7,
+                            x: 1.02,
+                            y: 0.5
+                        },
+                        line: {
+                            color: 'rgba(0, 0, 0, 0.3)',
+                            width: 1
                         }
                     },
-                    hovertemplate: 'Slip: %{marker.color:.2f} m<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
-                    name: 'Fault Patches',
+                    hovertext: patchHoverText,
+                    hoverinfo: 'text',
+                    name: 'Fault Rupture',
                     showlegend: true
                 });
+                
+                // Add fault outline (boundary of all patches)
+                const outlineLons = [...new Set(patchLons)].sort((a, b) => a - b);
+                const outlineLats = [...new Set(patchLats)].sort((a, b) => a - b);
+                
+                // Create a simple bounding box for the fault
+                if (outlineLons.length > 1 && outlineLats.length > 1) {
+                    const minLon = Math.min(...outlineLons);
+                    const maxLon = Math.max(...outlineLons);
+                    const minLat = Math.min(...outlineLats);
+                    const maxLat = Math.max(...outlineLats);
+                    
+                    traces.push({
+                        type: 'scattermapbox',
+                        mode: 'lines',
+                        lon: [minLon, maxLon, maxLon, minLon, minLon],
+                        lat: [minLat, minLat, maxLat, maxLat, minLat],
+                        line: {
+                            color: 'rgba(255, 0, 0, 0.8)',
+                            width: 3
+                        },
+                        name: 'Fault Outline',
+                        hoverinfo: 'skip',
+                        showlegend: false
+                    });
+                }
             } else {
                 // Use synthetic fault geometry
                 const strike = parseFloat(document.getElementById('strike').value);
@@ -1817,9 +1941,12 @@
             const stationNames = window.stationsData.map(s => s.name);
             
             const hoverText = window.stationsData.map(s => {
-                let text = `${s.name}<br>Lat: ${s.lat.toFixed(4)}°<br>Lon: ${s.lon.toFixed(4)}°`;
+                let text = `<b>${s.name}</b><br>Lat: ${s.lat.toFixed(4)}°<br>Lon: ${s.lon.toFixed(4)}°`;
                 if (s.distance !== undefined) {
                     text += `<br>Distance: ${s.distance.toFixed(1)} km`;
+                }
+                if (s.vs30 !== undefined) {
+                    text += `<br>Vs30: ${s.vs30.toFixed(0)} m/s`;
                 }
                 return text;
             });
@@ -1830,13 +1957,17 @@
                 lon: stationLons,
                 lat: stationLats,
                 marker: {
-                    size: 10,
+                    size: 11,
                     color: '#00CED1',
-                    symbol: 'triangle'
+                    symbol: 'triangle',
+                    line: {
+                        color: '#006B7D',
+                        width: 1.5
+                    }
                 },
                 hovertext: hoverText,
                 hoverinfo: 'text',
-                name: '▲ Stations',
+                name: `▲ Stations (${stationLats.length})`,
                 showlegend: true
             });
             
@@ -1852,7 +1983,17 @@
             const centerLat = (Math.max(...allLats) + Math.min(...allLats)) / 2;
             const centerLon = (Math.max(...allLons) + Math.min(...allLons)) / 2;
             
+            // Build title based on mode
+            let mapTitle = 'Fault & Stations Map';
+            if (window.isGeoJSONMode && window.eventMetadata) {
+                mapTitle = `${window.eventMetadata.eventid} - Mw ${window.eventMetadata.magnitude} ${window.eventMetadata.location}`;
+            }
+            
             const layout = {
+                title: {
+                    text: mapTitle,
+                    font: { size: 14, color: '#1f2937' }
+                },
                 mapbox: {
                     style: 'open-street-map',
                     center: {
@@ -1865,9 +2006,14 @@
                 legend: {
                     x: 0.01,
                     y: 0.99,
-                    bgcolor: 'rgba(255, 255, 255, 0.8)'
+                    xanchor: 'left',
+                    yanchor: 'top',
+                    bgcolor: 'rgba(255, 255, 255, 0.9)',
+                    bordercolor: 'rgba(0, 0, 0, 0.2)',
+                    borderwidth: 1,
+                    font: { size: 11 }
                 },
-                margin: {l: 0, r: 0, t: 0, b: 0}
+                margin: {l: 0, r: 0, t: 35, b: 0}
             };
             
             Plotly.newPlot('spatial-map', traces, layout, {responsive: true});
@@ -3130,30 +3276,39 @@
                 console.log(`   Magnitude: Mw ${computedMw.toFixed(2)} (metadata: ${window.eventMetadata.magnitude})`);
                 console.log(`   Avg Slip: ${avgSlip.toFixed(3)} m`);
                 
-                // Go to kinematics panel to show visualization
+                // Go directly to subsources panel (skip geometry and kinematics - they're read-only from GeoJSON)
                 document.getElementById('geometry-panel').style.transform = 'translateX(-100%)';
-                document.getElementById('kinematics-panel').style.transform = 'translateX(0%)';
-                document.getElementById('subsources-panel').style.transform = 'translateX(100%)';
+                document.getElementById('kinematics-panel').style.transform = 'translateX(-100%)';
+                document.getElementById('subsources-panel').style.transform = 'translateX(0%)';
                 document.getElementById('spatial-panel').style.transform = 'translateX(100%)';
                 
-                // Update progress to step 2 (Kinematics)
-                updateProgressSteps(2);
+                // Update progress to step 3 (Subsources)
+                updateProgressSteps(3);
                 
-                // Show visualization controls
-                document.getElementById('kinematics-viz-selector').classList.remove('hidden');
-                document.getElementById('computed-summary').classList.remove('hidden');
-                document.getElementById('proceed-subsources-btn').classList.remove('hidden');
-                document.getElementById('back-to-geometry-btn').classList.add('hidden');
-                document.getElementById('compute-kinematics-btn').classList.add('hidden');
+                // Add GeoJSON read-only banner to subsources panel
+                const subsourcesPanel = document.getElementById('subsources-panel');
+                const existingBanner = subsourcesPanel.querySelector('.geojson-banner');
+                if (!existingBanner) {
+                    const banner = document.createElement('div');
+                    banner.className = 'geojson-banner bg-blue-50 border border-blue-300 rounded-lg p-4 mb-4 mx-6';
+                    banner.innerHTML = `
+                        <div class="flex items-start">
+                            <i class="fas fa-info-circle text-blue-600 mt-1 mr-3"></i>
+                            <div>
+                                <h4 class="font-semibold text-blue-900 mb-1">GeoJSON Fault Data Loaded</h4>
+                                <p class="text-sm text-blue-800">
+                                    Event: <strong>${window.eventMetadata.eventid}</strong> - ${window.eventMetadata.location}<br>
+                                    The fault geometry, kinematics, rake, moment distribution, and rupture velocity are defined in the GeoJSON file and cannot be modified.<br>
+                                    Review the visualization below, then proceed to configure stations.
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                    subsourcesPanel.querySelector('.p-6').insertBefore(banner, subsourcesPanel.querySelector('.p-6').firstChild);
+                }
                 
-                // Update summary
-                document.getElementById('avg-slip-display').textContent = avgSlip.toFixed(3);
-                document.getElementById('total-moment-display').textContent = totalMoment.toExponential(2);
-                document.getElementById('computed-mw-display').textContent = computedMw.toFixed(2);
-                
-                // Show initial slip visualization
-                currentTab = 'slip';
-                updateKinematicsVisualization();
+                // Update grouping controls and visualization
+                updateSubsourceGrouping();
                 
                 // Update back button text
                 document.getElementById('back-button-text').textContent = 'Back to Start';
@@ -3172,10 +3327,12 @@
                     `Event: ${window.eventMetadata.eventid}\n` +
                     `Location: ${window.eventMetadata.location}\n` +
                     `Date: ${window.eventMetadata.date}\n\n` +
+                    `Patches: ${patches.length}\n` +
                     `Subsources: ${subsources.length}\n` +
                     `Magnitude: Mw ${computedMw.toFixed(2)}\n` +
                     `Avg Slip: ${avgSlip.toFixed(3)} m\n\n` +
-                    `Review the fault geometry and kinematics, then proceed to spatial setup`
+                    `Geometry, kinematics, rake, and rupture parameters are read-only from the GeoJSON.\n` +
+                    `Review the fault visualization, then proceed to spatial setup to configure stations.`
                 );
                 
             } catch (error) {
