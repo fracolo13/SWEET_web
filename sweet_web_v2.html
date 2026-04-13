@@ -2800,72 +2800,129 @@
                 const text = await file.text();
                 const geojsonData = JSON.parse(text);
                 
-                // Call backend API to load and process GeoJSON
-                const response = await fetch('http://localhost:5001/api/geojson/load', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(geojsonData)
-                });
+                // Extract metadata (epicenter, magnitude, etc.)
+                const metadata = geojsonData.metadata || {};
+                const epicenter = metadata.epicenter || {};
                 
-                if (!response.ok) throw new Error('Failed to load GeoJSON');
-                
-                const result = await response.json();
-                
-                // Store fault data globally
-                faultData = {
-                    patches: result.patches,
-                    totalMoment: result.totalMoment,
-                    computedMw: result.computedMw,
-                    averageSlip: result.averageSlip,
-                    nAlong: result.nAlong,
-                    nDown: result.nDown,
-                    length: result.length,
-                    width: result.width,
-                    corners: [], // No corners for GeoJSON
-                    isGeoJSON: true // Flag to indicate GeoJSON data
+                // Store event metadata globally
+                window.eventMetadata = {
+                    eventid: metadata.eventid || 'unknown',
+                    magnitude: epicenter.mag || 0,
+                    epicenter_lon: epicenter.lon || 0,
+                    epicenter_lat: epicenter.lat || 0,
+                    epicenter_depth: epicenter.depth || 10,
+                    location: epicenter.location || '',
+                    date: epicenter.date || '',
+                    total_moment: epicenter.moment || 0
                 };
                 
-                // Hide home screen and show workspace directly at kinematics
-                const homeEl = document.getElementById('home');
-                const workspaceEl = document.getElementById('workspace');
+                // Parse features to extract subsources
+                const features = geojsonData.features || [];
+                const subsources = [];
                 
-                if (homeEl) homeEl.classList.add('hidden');
-                if (workspaceEl) workspaceEl.classList.remove('hidden');
+                // Calculate centroid from first feature's coordinates if available
+                let refLon = window.eventMetadata.epicenter_lon;
+                let refLat = window.eventMetadata.epicenter_lat;
                 
-                // Hide all panels except kinematics (visualization only)
-                const geometryPanelEl = document.getElementById('geometry-panel');
-                const kinematicsPanelEl = document.getElementById('kinematics-panel');
-                const subsourcesPanelEl = document.getElementById('subsources-panel');
+                features.forEach((feature, idx) => {
+                    const props = feature.properties || {};
+                    const geom = feature.geometry || {};
+                    
+                    // Get centroid from geometry if available
+                    let centroid_lon = refLon;
+                    let centroid_lat = refLat;
+                    let centroid_depth = window.eventMetadata.epicenter_depth;
+                    
+                    if (geom.coordinates && geom.coordinates.length > 0 && geom.coordinates[0].length > 0) {
+                        // Calculate centroid from polygon coordinates
+                        const coords = geom.coordinates[0];
+                        let sumLon = 0, sumLat = 0;
+                        let count = 0;
+                        
+                        coords.forEach(coord => {
+                            if (coord && coord.length >= 2) {
+                                sumLon += coord[0];
+                                sumLat += coord[1];
+                                count++;
+                            }
+                        });
+                        
+                        if (count > 0) {
+                            centroid_lon = sumLon / count;
+                            centroid_lat = sumLat / count;
+                        }
+                    }
+                    
+                    // Convert from km relative coordinates to absolute if needed
+                    // If x==ew and y==ns are present, they might be relative distances
+                    if (props['x==ew'] !== undefined && props['y==ns'] !== undefined) {
+                        // Convert km to degrees (rough approximation: 1 deg ≈ 111 km)
+                        const dx_km = props['x==ew'];
+                        const dy_km = props['y==ns'];
+                        centroid_lon = refLon + (dx_km / (111 * Math.cos(refLat * Math.PI / 180)));
+                        centroid_lat = refLat + (dy_km / 111);
+                    }
+                    
+                   // Extract subsource properties
+                    const subsource = {
+                        centroid_lon: centroid_lon,
+                        centroid_lat: centroid_lat,
+                        centroid_depth: centroid_depth,
+                        sf_moment: props.sf_moment || props.moment || 0,
+                        trup: props.trup || 0,
+                        rise: props.rise || 1.0,
+                        slip: props.slip || 0,
+                        rake: props.rake || 0,
+                        magnitude: (2.0 / 3.0) * (Math.log10(props.sf_moment || 1e15) - 9.1)
+                    };
+                    
+                    // Only include subsources with non-zero moment
+                    if (subsource.sf_moment > 0) {
+                        subsources.push(subsource);
+                    }
+                });
                 
-                if (geometryPanelEl) geometryPanelEl.style.transform = 'translateX(-100%)';
-                if (kinematicsPanelEl) kinematicsPanelEl.style.transform = 'translateX(0)';
-                if (subsourcesPanelEl) subsourcesPanelEl.style.transform = 'translateX(100%)';
+                // Store subsources globally
+                window.geojsonSubsources = subsources;
+                window.isGeoJSONMode = true;
                 
-                // Update progress to step 2
-                updateProgressSteps(2);
+                // Calculate total stats
+                const totalMoment = subsources.reduce((sum, s) => sum + s.sf_moment, 0);
+                const avgSlip = subsources.reduce((sum, s) => sum + s.slip, 0) / subsources.length;
+                const computedMw = (2.0 / 3.0) * (Math.log10(totalMoment) - 9.1);
                 
-                // Show visualization controls (but no input controls)
-                const kinematicsVizEl = document.getElementById('kinematics-viz-selector');
-                const proceedSubsourcesEl = document.getElementById('proceed-subsources-btn');
-                const computeKinematicsEl = document.getElementById('compute-kinematics-btn');
-                const backButtonEl = document.getElementById('back-to-geometry-btn');
-                const kinematicsControlsEl = document.getElementById('kinematics-controls');
+                console.log(`✅ Loaded ${subsources.length} subsources from GeoJSON`);
+                console.log(`   Event: ${window.eventMetadata.eventid} - ${window.eventMetadata.location}`);
+                console.log(`   Magnitude: Mw ${computedMw.toFixed(2)} (metadata: ${window.eventMetadata.magnitude})`);
+                console.log(`   Avg Slip: ${avgSlip.toFixed(3)} m`);
                 
-                if (kinematicsVizEl) kinematicsVizEl.classList.remove('hidden');
-                if (proceedSubsourcesEl) proceedSubsourcesEl.classList.remove('hidden');
-                if (computeKinematicsEl) computeKinematicsEl.classList.add('hidden');
-                if (backButtonEl) backButtonEl.classList.add('hidden'); // Hide back button for GeoJSON
-                if (kinematicsControlsEl) kinematicsControlsEl.classList.add('hidden'); // Hide input controls
+                // Skip to spatial setup panel
+                document.getElementById('geometry-panel').style.transform = 'translateX(-100%)';
+                document.getElementById('kinematics-panel').style.transform = 'translateX(-100%)';
+                document.getElementById('subsources-panel').style.transform = 'translateX(-100%)';
+                document.getElementById('spatial-panel').style.transform = 'translateX(0)';
                 
-                // Show initial visualization
-                currentTab = 'slip';
-                updateKinematicsVisualization();
+                // Update progress to step 4 (Spatial Setup)
+                updateProgressSteps(4);
                 
-                alert(`Loaded ${result.numPatches} patches from GeoJSON\nMw: ${result.computedMw.toFixed(2)}\nAvg Slip: ${result.averageSlip.toFixed(2)} m`);
+                // Update back button text
+                document.getElementById('back-button-text').textContent = 'Back to Start';
+                
+                // Show confirmation message
+                alert(
+                    `✅ GeoJSON Loaded Successfully!\n\n` +
+                    `Event: ${window.eventMetadata.eventid}\n` +
+                    `Location: ${window.eventMetadata.location}\n` +
+                    `Date: ${window.eventMetadata.date}\n\n` +
+                    `Subsources: ${subsources.length}\n` +
+                    `Magnitude: Mw ${computedMw.toFixed(2)}\n` +
+                    `Avg Slip: ${avgSlip.toFixed(3)} m\n\n` +
+                    `Now configure stations and compute waveforms`
+                );
                 
             } catch (error) {
                 console.error('Error loading GeoJSON:', error);
-                alert('Error loading GeoJSON: ' + error.message);
+                alert('Error loading GeoJSON: ' + error.message + '\n\nPlease check the console for details.');
             }
         }
 
@@ -3068,6 +3125,16 @@
                 
                 showProgress('Analyzing waveforms...', 95, 'Computing PGA, PGV, and generating plots');
                 
+                // Determine title prefix based on mode
+                let titlePrefix;
+                if (window.isGeoJSONMode && window.eventMetadata) {
+                    titlePrefix = `${window.eventMetadata.eventid} - Mw ${window.eventMetadata.magnitude.toFixed(1)} ${window.eventMetadata.location}`;
+                } else if (globalKinematicsResult && globalKinematicsResult.computed_mw) {
+                    titlePrefix = `Mw ${globalKinematicsResult.computed_mw.toFixed(1)} Event`;
+                } else {
+                    titlePrefix = 'Synthetic Event';
+                }
+                
                 // Call API to analyze waveforms
                 const analysisResponse = await fetch('/api/waveforms/analyze', {
                     method: 'POST',
@@ -3076,7 +3143,7 @@
                         mseed_file: currentWaveformResult.output_files[0],
                         subsources: subsources,
                         stations: stations,
-                        title_prefix: `Mw ${globalKinematicsResult.computed_mw.toFixed(1)} Event`
+                        title_prefix: titlePrefix
                     })
                 });
                 
@@ -3278,7 +3345,13 @@
         
         // Prepare subsources data for API
         function prepareSubsourcesForAPI() {
-            // Check if grouping data exists
+            // If in GeoJSON mode, return the loaded subsources directly
+            if (window.isGeoJSONMode && window.geojsonSubsources) {
+                console.log(`Using ${window.geojsonSubsources.length} subsources from GeoJSON`);
+                return window.geojsonSubsources;
+            }
+            
+            // Check if grouping data exists (for synthetic mode)
             if (!window.currentGrouping || !window.currentGrouping.groups) {
                 console.error('No subsource grouping found. Please complete Step 3: Subsource Grouping first.');
                 throw new Error('Please complete subsource grouping (Step 3) before computing waveforms.');
