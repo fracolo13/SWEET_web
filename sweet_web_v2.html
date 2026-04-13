@@ -477,6 +477,15 @@
                                 <h5 class="text-xs font-semibold text-gray-700 mb-2">Stations (<span id="station-count">0</span>)</h5>
                                 <div id="station-items" class="text-xs text-gray-600 space-y-1"></div>
                             </div>
+                            
+                            <!-- Map Visualization -->
+                            <div id="spatial-map-container" class="mt-4 hidden">
+                                <h5 class="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                                    <i class="fas fa-map mr-2 text-blue-500"></i>
+                                    Fault & Stations Map
+                                </h5>
+                                <div id="spatial-map" class="border border-gray-300 rounded-lg" style="height: 400px;"></div>
+                            </div>
                         </div>
                         
                         <!-- Waveform Computation Section -->
@@ -1692,6 +1701,176 @@
             stationList.classList.remove('hidden');
             // Show waveform configuration section now that stations are loaded
             document.getElementById('waveform-config').classList.remove('hidden');
+            
+            // Update spatial map visualization
+            visualizeSpatialMap();
+        }
+        
+        // Visualize fault and stations on spatial setup panel
+        function visualizeSpatialMap() {
+            const hypoLat = parseFloat(document.getElementById('hypo-lat').value);
+            const hypoLon = parseFloat(document.getElementById('hypo-lon').value);
+            
+            // Check if we have stations
+            if (!window.stationsData || window.stationsData.length === 0) {
+                document.getElementById('spatial-map-container').classList.add('hidden');
+                return;
+            }
+            
+            // Show map container
+            document.getElementById('spatial-map-container').classList.remove('hidden');
+            
+            // Prepare traces
+            const traces = [];
+            
+            // Add fault trace
+            if (window.isGeoJSONMode && window.geojsonPatches) {
+                // Use GeoJSON fault geometry
+                const patchLons = window.geojsonPatches.map(p => p.centroid_lon);
+                const patchLats = window.geojsonPatches.map(p => p.centroid_lat);
+                const patchSlip = window.geojsonPatches.map(p => p.slip);
+                
+                // Create fault patch markers with colors based on slip
+                const maxSlip = Math.max(...patchSlip);
+                const colors = patchSlip.map(slip => {
+                    const intensity = Math.min(slip / maxSlip, 1.0);
+                    return `rgba(255, ${Math.floor((1 - intensity) * 100)}, 0, 0.7)`;
+                });
+                
+                traces.push({
+                    type: 'scattermapbox',
+                    mode: 'markers',
+                    lon: patchLons,
+                    lat: patchLats,
+                    marker: {
+                        size: 8,
+                        color: patchSlip,
+                        colorscale: 'Hot',
+                        showscale: true,
+                        colorbar: {
+                            title: 'Slip (m)',
+                            x: 1.02
+                        }
+                    },
+                    hovertemplate: 'Slip: %{marker.color:.2f} m<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
+                    name: 'Fault Patches',
+                    showlegend: true
+                });
+            } else {
+                // Use synthetic fault geometry
+                const strike = parseFloat(document.getElementById('strike').value);
+                const length = faultData.length;
+                const strikeRad = strike * Math.PI / 180;
+                
+                // Fault endpoints along strike
+                const halfLength = length / 2;
+                const deltaLat1 = (halfLength * Math.cos(strikeRad)) / 111.0;
+                const deltaLon1 = (halfLength * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
+                
+                const faultStart = {
+                    lat: hypoLat - deltaLat1,
+                    lon: hypoLon - deltaLon1
+                };
+                const faultEnd = {
+                    lat: hypoLat + deltaLat1,
+                    lon: hypoLon + deltaLon1
+                };
+                
+                traces.push({
+                    type: 'scattermapbox',
+                    mode: 'lines+markers',
+                    lon: [faultStart.lon, faultEnd.lon],
+                    lat: [faultStart.lat, faultEnd.lat],
+                    marker: {
+                        size: 10,
+                        color: 'red'
+                    },
+                    line: {
+                        color: 'red',
+                        width: 4
+                    },
+                    name: 'Fault',
+                    hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
+                    showlegend: true
+                });
+            }
+            
+            // Add hypocenter marker
+            traces.push({
+                type: 'scattermapbox',
+                mode: 'markers',
+                lon: [hypoLon],
+                lat: [hypoLat],
+                marker: {
+                    size: 18,
+                    color: '#FFD700',
+                    symbol: 'star'
+                },
+                name: '⭐ Epicenter',
+                hovertemplate: 'Epicenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
+                showlegend: true
+            });
+            
+            // Add station markers
+            const stationLats = window.stationsData.map(s => s.lat);
+            const stationLons = window.stationsData.map(s => s.lon);
+            const stationNames = window.stationsData.map(s => s.name);
+            
+            const hoverText = window.stationsData.map(s => {
+                let text = `${s.name}<br>Lat: ${s.lat.toFixed(4)}°<br>Lon: ${s.lon.toFixed(4)}°`;
+                if (s.distance !== undefined) {
+                    text += `<br>Distance: ${s.distance.toFixed(1)} km`;
+                }
+                return text;
+            });
+            
+            traces.push({
+                type: 'scattermapbox',
+                mode: 'markers',
+                lon: stationLons,
+                lat: stationLats,
+                marker: {
+                    size: 10,
+                    color: '#00CED1',
+                    symbol: 'triangle'
+                },
+                hovertext: hoverText,
+                hoverinfo: 'text',
+                name: '▲ Stations',
+                showlegend: true
+            });
+            
+            // Calculate map bounds
+            const allLats = [...stationLats, hypoLat];
+            const allLons = [...stationLons, hypoLon];
+            
+            if (window.isGeoJSONMode && window.geojsonPatches) {
+                allLats.push(...window.geojsonPatches.map(p => p.centroid_lat));
+                allLons.push(...window.geojsonPatches.map(p => p.centroid_lon));
+            }
+            
+            const centerLat = (Math.max(...allLats) + Math.min(...allLats)) / 2;
+            const centerLon = (Math.max(...allLons) + Math.min(...allLons)) / 2;
+            
+            const layout = {
+                mapbox: {
+                    style: 'open-street-map',
+                    center: {
+                        lat: centerLat,
+                        lon: centerLon
+                    },
+                    zoom: 7
+                },
+                showlegend: true,
+                legend: {
+                    x: 0.01,
+                    y: 0.99,
+                    bgcolor: 'rgba(255, 255, 255, 0.8)'
+                },
+                margin: {l: 0, r: 0, t: 0, b: 0}
+            };
+            
+            Plotly.newPlot('spatial-map', traces, layout, {responsive: true});
         }
         
         // Update visualization based on dropdown selection
@@ -2129,14 +2308,15 @@
                         showscale: true,
                         colorbar: {title: 'Slip (m)'}
                     },
-                    text: patches.map(p => `Slip: ${p.slip.toFixed(2)} m`)
+                    text: patches.map(p => `Slip: ${p.slip.toFixed(2)} m<br>Lon: ${p.x.toFixed(4)}°<br>Lat: ${p.y.toFixed(4)}°<br>Depth: ${p.z.toFixed(1)} km`),
+                    hoverinfo: 'text'
                 };
                 
                 const layout = {
                     title: 'Slip Distribution',
                     scene: {
-                        xaxis: {title: 'Longitude'},
-                        yaxis: {title: 'Latitude'},
+                        xaxis: {title: 'Longitude (°)'},
+                        yaxis: {title: 'Latitude (°)'},
                         zaxis: {title: 'Depth (km)', autorange: 'reversed'}
                     },
                     margin: {l: 0, r: 0, t: 40, b: 0}
@@ -2159,14 +2339,15 @@
                         showscale: true,
                         colorbar: {title: 'Moment (N·m)'}
                     },
-                    text: patches.map(p => `Moment: ${p.moment.toExponential(2)} N·m`)
+                    text: patches.map(p => `Moment: ${p.moment.toExponential(2)} N·m<br>Lon: ${p.x.toFixed(4)}°<br>Lat: ${p.y.toFixed(4)}°<br>Depth: ${p.z.toFixed(1)} km`),
+                    hoverinfo: 'text'
                 };
                 
                 const layout = {
                     title: 'Moment Release',
                     scene: {
-                        xaxis: {title: 'Longitude'},
-                        yaxis: {title: 'Latitude'},
+                        xaxis: {title: 'Longitude (°)'},
+                        yaxis: {title: 'Latitude (°)'},
                         zaxis: {title: 'Depth (km)', autorange: 'reversed'}
                     },
                     margin: {l: 0, r: 0, t: 40, b: 0}
@@ -2174,7 +2355,7 @@
                 
                 Plotly.newPlot('plot-container', [trace], layout);
                 
-            } else if (type === 'rupture') {
+            } else if (type === 'rupture-time' || type === 'rupture') {
                 // Rupture time as 3D scatter
                 const trace = {
                     x: patches.map(p => p.x),
@@ -2189,14 +2370,15 @@
                         showscale: true,
                         colorbar: {title: 'Time (s)'}
                     },
-                    text: patches.map(p => `Rupture Time: ${p.rupture_time.toFixed(2)} s`)
+                    text: patches.map(p => `Rupture Time: ${p.rupture_time.toFixed(2)} s<br>Lon: ${p.x.toFixed(4)}°<br>Lat: ${p.y.toFixed(4)}°<br>Depth: ${p.z.toFixed(1)} km`),
+                    hoverinfo: 'text'
                 };
                 
                 const layout = {
                     title: 'Rupture Time',
                     scene: {
-                        xaxis: {title: 'Longitude'},
-                        yaxis: {title: 'Latitude'},
+                        xaxis: {title: 'Longitude (°)'},
+                        yaxis: {title: 'Latitude (°)'},
                         zaxis: {title: 'Depth (km)', autorange: 'reversed'}
                     },
                     margin: {l: 0, r: 0, t: 40, b: 0}
@@ -2524,6 +2706,12 @@
         function visualizeRuptureTime() {
             if (!faultData) return;
             
+            // Handle GeoJSON differently
+            if (faultData.isGeoJSON) {
+                visualizeGeoJSON('rupture-time');
+                return;
+            }
+            
             const patches = faultData.patches;
             const patchLength = faultData.length / faultData.nAlong;
             const patchWidth = faultData.width / faultData.nDown;
@@ -2816,9 +3004,10 @@
                     total_moment: epicenter.moment || 0
                 };
                 
-                // Parse features to extract subsources
+                // Parse features to extract subsources and geometry
                 const features = geojsonData.features || [];
                 const subsources = [];
+                const patches = [];
                 
                 // Calculate centroid from first feature's coordinates if available
                 let refLon = window.eventMetadata.epicenter_lon;
@@ -2836,13 +3025,14 @@
                     if (geom.coordinates && geom.coordinates.length > 0 && geom.coordinates[0].length > 0) {
                         // Calculate centroid from polygon coordinates
                         const coords = geom.coordinates[0];
-                        let sumLon = 0, sumLat = 0;
+                        let sumLon = 0, sumLat = 0, sumDepth = 0;
                         let count = 0;
                         
                         coords.forEach(coord => {
                             if (coord && coord.length >= 2) {
                                 sumLon += coord[0];
                                 sumLat += coord[1];
+                                if (coord.length >= 3) sumDepth += coord[2];
                                 count++;
                             }
                         });
@@ -2850,13 +3040,12 @@
                         if (count > 0) {
                             centroid_lon = sumLon / count;
                             centroid_lat = sumLat / count;
+                            centroid_depth = sumDepth / count || centroid_depth;
                         }
                     }
                     
                     // Convert from km relative coordinates to absolute if needed
-                    // If x==ew and y==ns are present, they might be relative distances
                     if (props['x==ew'] !== undefined && props['y==ns'] !== undefined) {
-                        // Convert km to degrees (rough approximation: 1 deg ≈ 111 km)
                         const dx_km = props['x==ew'];
                         const dy_km = props['y==ns'];
                         centroid_lon = refLon + (dx_km / (111 * Math.cos(refLat * Math.PI / 180)));
@@ -2876,14 +3065,28 @@
                         magnitude: (2.0 / 3.0) * (Math.log10(props.sf_moment || 1e15) - 9.1)
                     };
                     
+                    // Create patch for visualization
+                    const patch = {
+                        centroid_lon: centroid_lon,
+                        centroid_lat: centroid_lat,
+                        depth: centroid_depth,
+                        slip: props.slip || 0,
+                        moment: props.sf_moment || 0,
+                        rupture_time: props.trup || 0,
+                        rake: props.rake || 0,
+                        coordinates: geom.coordinates
+                    };
+                    
                     // Only include subsources with non-zero moment
                     if (subsource.sf_moment > 0) {
                         subsources.push(subsource);
+                        patches.push(patch);
                     }
                 });
                 
-                // Store subsources globally
-                window.geojsonSubsources = subsources;
+                // Store subsources and patches globally
+                window.geojsonSubsources = subsources;  
+                window.geojsonPatches = patches;
                 window.isGeoJSONMode = true;
                 
                 // Calculate total stats
@@ -2891,22 +3094,77 @@
                 const avgSlip = subsources.reduce((sum, s) => sum + s.slip, 0) / subsources.length;
                 const computedMw = (2.0 / 3.0) * (Math.log10(totalMoment) - 9.1);
                 
+                // Create a fake kinematics result for visualization
+                globalKinematicsResult = {
+                    patches: patches,
+                    total_moment: totalMoment,
+                    computed_mw: computedMw,
+                    avg_slip: avgSlip,
+                    n_along: 1,
+                    n_down: patches.length
+                };
+                
+                // Set faultData for visualizations with patches that have x, y, z coordinates
+                const visualPatches = patches.map(p => ({
+                    x: p.centroid_lon,
+                    y: p.centroid_lat,
+                    z: p.depth,
+                    slip: p.slip,
+                    moment: p.moment,
+                    rupture_time: p.rupture_time,
+                    rake: p.rake
+                }));
+                
+                faultData = {
+                    isGeoJSON: true,
+                    patches: visualPatches,
+                    totalMoment: totalMoment,
+                    computedMw: computedMw,
+                    averageSlip: avgSlip,
+                    nAlong: 1,
+                    nDown: patches.length
+                };
+                
                 console.log(`✅ Loaded ${subsources.length} subsources from GeoJSON`);
                 console.log(`   Event: ${window.eventMetadata.eventid} - ${window.eventMetadata.location}`);
                 console.log(`   Magnitude: Mw ${computedMw.toFixed(2)} (metadata: ${window.eventMetadata.magnitude})`);
                 console.log(`   Avg Slip: ${avgSlip.toFixed(3)} m`);
                 
-                // Skip to spatial setup panel
+                // Go to kinematics panel to show visualization
                 document.getElementById('geometry-panel').style.transform = 'translateX(-100%)';
-                document.getElementById('kinematics-panel').style.transform = 'translateX(-100%)';
-                document.getElementById('subsources-panel').style.transform = 'translateX(-100%)';
-                document.getElementById('spatial-panel').style.transform = 'translateX(0)';
+                document.getElementById('kinematics-panel').style.transform = 'translateX(0%)';
+                document.getElementById('subsources-panel').style.transform = 'translateX(100%)';
+                document.getElementById('spatial-panel').style.transform = 'translateX(100%)';
                 
-                // Update progress to step 4 (Spatial Setup)
-                updateProgressSteps(4);
+                // Update progress to step 2 (Kinematics)
+                updateProgressSteps(2);
+                
+                // Show visualization controls
+                document.getElementById('kinematics-viz-selector').classList.remove('hidden');
+                document.getElementById('computed-summary').classList.remove('hidden');
+                document.getElementById('proceed-subsources-btn').classList.remove('hidden');
+                document.getElementById('back-to-geometry-btn').classList.add('hidden');
+                document.getElementById('compute-kinematics-btn').classList.add('hidden');
+                
+                // Update summary
+                document.getElementById('avg-slip-display').textContent = avgSlip.toFixed(3);
+                document.getElementById('total-moment-display').textContent = totalMoment.toExponential(2);
+                document.getElementById('computed-mw-display').textContent = computedMw.toFixed(2);
+                
+                // Show initial slip visualization
+                currentTab = 'slip';
+                updateKinematicsVisualization();
                 
                 // Update back button text
                 document.getElementById('back-button-text').textContent = 'Back to Start';
+                
+                // Populate fault location with epicenter
+                document.getElementById('hypo-lat').value = window.eventMetadata.epicenter_lat;
+                document.getElementById('hypo-lon').value = window.eventMetadata.epicenter_lon;
+                
+                // Make strike read-only for GeoJSON
+                document.getElementById('strike').disabled = true;
+                document.getElementById('strike').classList.add('opacity-50', 'cursor-not-allowed');
                 
                 // Show confirmation message
                 alert(
@@ -2917,7 +3175,7 @@
                     `Subsources: ${subsources.length}\n` +
                     `Magnitude: Mw ${computedMw.toFixed(2)}\n` +
                     `Avg Slip: ${avgSlip.toFixed(3)} m\n\n` +
-                    `Now configure stations and compute waveforms`
+                    `Review the fault geometry and kinematics, then proceed to spatial setup`
                 );
                 
             } catch (error) {
