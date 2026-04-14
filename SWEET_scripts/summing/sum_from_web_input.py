@@ -285,15 +285,12 @@ def sum_waveforms(
                 # Find closest available distance bin
                 tmpl_dist = find_closest_distance(avail_dists, tmpl_dist)
                 
-                # Load template
+                # Load template (cached S3 listing makes this fast)
                 templates_attempted += 1
-                print(f'[DEBUG] Loading template for {sta_code}: VS30={tmpl_vs30}, Mag={tmpl_mag}, Dist={tmpl_dist}km, Real={real_idx}')
                 envelope = load_template(
                     templates_dir,
                     tmpl_vs30, tmpl_mag, tmpl_dist, real_idx
                 )
-                
-                print(f'[DEBUG] Template result for {sta_code}: {"FOUND" if envelope is not None else "NONE"}')
                 
                 if envelope is None:
                     templates_failed += 1

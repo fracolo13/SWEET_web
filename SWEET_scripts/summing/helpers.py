@@ -235,25 +235,19 @@ def load_template(
     # Use S3 if enabled
     if USE_S3_TEMPLATES and S3_AVAILABLE:
         try:
-            # List templates in this bin and pick one based on realization_idx
+            # List templates in this bin and pick one based on realization_idx (cached)
             loader = get_s3_loader()
-            print(f'[DEBUG S3] Listing templates: {vs30_dir}/{mag_dir}/{dist_dir}')
             available_templates = loader.list_templates(vs30_dir, mag_dir, dist_dir)
-            print(f'[DEBUG S3] Found {len(available_templates)} templates')
             
             if not available_templates:
+                # Only log first miss per directory
                 print(f'[WARNING] No templates found in S3: {vs30_dir}/{mag_dir}/{dist_dir}')
                 return None
             
             # Pick template using modulo to wrap around if needed
             template_file = available_templates[realization_idx % len(available_templates)]
             
-            print(f'[DEBUG] Loading from S3: {vs30_dir}/{mag_dir}/{dist_dir}/{template_file}')
             template = load_template_from_s3(vs30_dir, mag_dir, dist_dir, template_file)
-            if template is not None:
-                print(f'[DEBUG] Loaded template shape: {template.shape}')
-            else:
-                print(f'[ERROR] Template loaded as None!')
             return template
         except FileNotFoundError as e:
             print(f'[WARNING] Template not found in S3: {vs30_dir}/{mag_dir}/{dist_dir} - {e}')

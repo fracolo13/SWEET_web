@@ -78,6 +78,9 @@ class S3TemplateLoader:
         # Create cache directory
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
+        # Cache for directory listings (avoids repeated S3 LIST calls)
+        self._listing_cache = {}
+        
         logger.info(f"S3TemplateLoader initialized: bucket={self.bucket_name}, "
                    f"prefix={self.prefix}, cache={self.cache_dir}")
     
@@ -125,6 +128,7 @@ class S3TemplateLoader:
     def list_templates(self, vs30_dir: str, mag_dir: str, dist_dir: str) -> List[str]:
         """
         List available templates in a specific bin.
+        Uses caching to avoid repeated S3 LIST operations.
         
         Args:
             vs30_dir: VS30 directory
@@ -134,7 +138,16 @@ class S3TemplateLoader:
         Returns:
             List of template filenames
         """
-        prefix = f"{self.prefix}{vs30_dir}/{mag_dir}/{dist_dir}/"
+        # Create cache key
+        cache_key = f"{vs30_dir}/{mag_dir}/{dist_dir}"
+        
+        # Return cached result if available
+        if cache_key in self._listing_cache:
+            logger.debug(f"Cache hit for directory listing: {cache_key}")
+            return self._listing_cache[cache_key]
+        
+        # Not in cache - fetch from S3
+        prefix = f"{self.prefix}{cache_key}/"
         
         try:
             response = self.s3_client.list_objects_v2(
@@ -143,6 +156,7 @@ class S3TemplateLoader:
             )
             
             if 'Contents' not in response:
+                self._listing_cache[cache_key] = []
                 return []
             
             templates = []
@@ -151,10 +165,15 @@ class S3TemplateLoader:
                 if filename.endswith('.npy'):
                     templates.append(filename)
             
+            # Cache the result
+            self._listing_cache[cache_key] = templates
+            logger.debug(f"Cached directory listing: {cache_key} ({len(templates)} templates)")
+            
             return templates
         
         except ClientError as e:
             logger.error(f"Failed to list S3 objects: {e}")
+            self._listing_cache[cache_key] = []
             return []
     
     def get_available_templates_info(self) -> Dict[str, List]:
