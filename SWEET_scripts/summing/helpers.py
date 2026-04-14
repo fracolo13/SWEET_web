@@ -249,20 +249,27 @@ def load_template(
             traceback.print_exc()
             return None
     
-    # Local filesystem - look for template_{idx}.npy pattern
-    template_file = f'template_{realization_idx:02d}.npy'
-    template_path = os.path.join(
-        templates_dir, vs30_dir, mag_dir, dist_dir, template_file
-    )
+    # Local filesystem - list available templates and pick one
+    template_dir = os.path.join(templates_dir, vs30_dir, mag_dir, dist_dir)
     
-    if not os.path.isfile(template_path):
+    if not os.path.isdir(template_dir):
         return None
     
+    # List all .npy files in the directory
     try:
+        available_templates = [f for f in os.listdir(template_dir) if f.endswith('.npy')]
+        
+        if not available_templates:
+            return None
+        
+        # Pick template using modulo to wrap around if needed
+        template_file = available_templates[realization_idx % len(available_templates)]
+        template_path = os.path.join(template_dir, template_file)
+        
         template = np.load(template_path)
         return template
     except Exception as e:
-        print(f'[WARNING] Failed to load template {template_path}: {e}')
+        print(f'[WARNING] Failed to load template from {template_dir}: {e}')
         return None
 
 
