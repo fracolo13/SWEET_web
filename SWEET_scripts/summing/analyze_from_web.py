@@ -250,13 +250,6 @@ def plot_pga_pgv_distance(
     ax.grid(alpha=0.3)
     ax.set_xlim(left=0)
     
-    # Add statistics text
-    stats_txt = (f"Stations: {len(analysis_df)}\n"
-                f"Max PGA: {analysis_df['pga_h'].max():.3f} m/s²\n"
-                f"Mean PGA: {analysis_df['pga_h'].mean():.3f} m/s²")
-    ax.text(0.02, 0.98, stats_txt, transform=ax.transAxes,
-           fontsize=9, va='top', bbox=dict(boxstyle='round', fc='white', alpha=0.9))
-    
     plt.tight_layout()
     pga_file = os.path.join(output_dir, 'pga_vs_distance.png')
     plt.savefig(pga_file, dpi=150, bbox_inches='tight')
@@ -277,12 +270,6 @@ def plot_pga_pgv_distance(
     ax.set_yscale('log')
     ax.grid(alpha=0.3)
     ax.set_xlim(left=0)
-    
-    stats_txt = (f"Stations: {len(analysis_df)}\n"
-                f"Max PGV: {analysis_df['pgv_h'].max():.4f} m/s\n"
-                f"Mean PGV: {analysis_df['pgv_h'].mean():.4f} m/s")
-    ax.text(0.02, 0.98, stats_txt, transform=ax.transAxes,
-           fontsize=9, va='top', bbox=dict(boxstyle='round', fc='white', alpha=0.9))
     
     plt.tight_layout()
     pgv_file = os.path.join(output_dir, 'pgv_vs_distance.png')

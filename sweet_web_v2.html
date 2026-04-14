@@ -827,6 +827,17 @@
                 input.value = '';
             });
             
+            // Hide all action buttons
+            const confirmGeometryBtn = document.getElementById('confirm-geometry-btn');
+            if (confirmGeometryBtn) confirmGeometryBtn.classList.add('hidden');
+            
+            // Reset all input fields and controls to defaults
+            document.querySelectorAll('select').forEach(select => {
+                if (select.options.length > 0) {
+                    select.selectedIndex = 0;
+                }
+            });
+            
             // Hide computed results sections
             document.getElementById('computed-summary').classList.add('hidden');
             document.getElementById('kinematics-viz-selector').classList.add('hidden');
@@ -849,10 +860,50 @@
             const dataLinks = document.getElementById('data-links');
             if (dataLinks) dataLinks.innerHTML = '';
             
+            // Clear station list
+            const stationList = document.getElementById('station-list');
+            if (stationList) stationList.classList.add('hidden');
+            const stationItems = document.getElementById('station-items');
+            if (stationItems) stationItems.innerHTML = '';
+            const stationCount = document.getElementById('station-count');
+            if (stationCount) stationCount.textContent = '0';
+            
+            // Clear subsource list
+            const subsourceList = document.getElementById('subsource-list');
+            if (subsourceList) subsourceList.innerHTML = '';
+            const subsourceCount = document.getElementById('subsource-count');
+            if (subsourceCount) subsourceCount.textContent = '0';
+            
+            // Hide status messages
+            const waveformStatus = document.getElementById('waveform-status');
+            if (waveformStatus) waveformStatus.classList.add('hidden');
+            
+            // Clear progress display
+            const progressPercent = document.getElementById('progress-percent');
+            if (progressPercent) progressPercent.textContent = '0%';
+            const progressBar = document.getElementById('progress-bar');
+            if (progressBar) progressBar.style.width = '0%';
+            const progressTime = document.getElementById('progress-time');
+            if (progressTime) progressTime.textContent = '0s';
+            
+            // Clear any spatial map
+            const spatialMapContainer = document.getElementById('spatial-map-container');
+            if (spatialMapContainer) spatialMapContainer.classList.add('hidden');
+            const spatialMap = document.getElementById('spatial-map');
+            if (spatialMap && window.Plotly) {
+                try {
+                    Plotly.purge('spatial-map');
+                } catch (e) {
+                    console.log('No spatial map to purge');
+                }
+            }
+            
             // Reset subsources data
             window.subsourcesData = [];
             window.geojsonPatches = [];
             window.stationsData = [];
+            window.eventMetadata = null;
+            window.isGeoJSONMode = false;
             
             console.log('Application reset to landing page');
         }
