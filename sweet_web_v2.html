@@ -1462,16 +1462,27 @@
                 return;
             }
 
+            // Filter out stations with invalid coordinates
+            const validStations = stations.filter(s => 
+                s.lat !== undefined && !isNaN(s.lat) && 
+                s.lon !== undefined && !isNaN(s.lon)
+            );
+            
+            if (validStations.length === 0) {
+                console.log('No stations with valid coordinates');
+                return;
+            }
+
             // Extract station coordinates
-            const stationLats = stations.map(s => s.lat);
-            const stationLons = stations.map(s => s.lon);
-            const stationNames = stations.map(s => s.name);
+            const stationLats = validStations.map(s => s.lat);
+            const stationLons = validStations.map(s => s.lon);
+            const stationNames = validStations.map(s => s.name);
             
             console.log('Station lats:', stationLats.slice(0, 3));
             console.log('Station lons:', stationLons.slice(0, 3));
             
             // Create hover text with station details
-            const hoverText = stations.map(s => {
+            const hoverText = validStations.map(s => {
                 let text = `${s.name}<br>Lat: ${s.lat.toFixed(4)}°<br>Lon: ${s.lon.toFixed(4)}°`;
                 if (s.distance !== undefined) {
                     text += `<br>Distance: ${s.distance} km`;
@@ -1941,11 +1952,16 @@
             });
             
             // Add station markers
-            const stationLats = window.stationsData.map(s => s.lat);
-            const stationLons = window.stationsData.map(s => s.lon);
-            const stationNames = window.stationsData.map(s => s.name);
+            const validStations = window.stationsData.filter(s => 
+                s.lat !== undefined && !isNaN(s.lat) && 
+                s.lon !== undefined && !isNaN(s.lon)
+            );
             
-            const hoverText = window.stationsData.map(s => {
+            const stationLats = validStations.map(s => s.lat);
+            const stationLons = validStations.map(s => s.lon);
+            const stationNames = validStations.map(s => s.name);
+            
+            const hoverText = validStations.map(s => {
                 let text = `<b>${s.name}</b><br>Lat: ${s.lat.toFixed(4)}°<br>Lon: ${s.lon.toFixed(4)}°`;
                 if (s.distance !== undefined) {
                     text += `<br>Distance: ${s.distance.toFixed(1)} km`;
@@ -1977,16 +1993,17 @@
             });
             
             // Calculate map bounds
-            const allLats = [...stationLats, hypoLat];
-            const allLons = [...stationLons, hypoLon];
+            const allLats = [...stationLats, hypoLat].filter(v => v !== undefined && !isNaN(v));
+            const allLons = [...stationLons, hypoLon].filter(v => v !== undefined && !isNaN(v));
             
             if (window.isGeoJSONMode && window.geojsonPatches) {
-                allLats.push(...window.geojsonPatches.map(p => p.centroid_lat));
-                allLons.push(...window.geojsonPatches.map(p => p.centroid_lon));
+                allLats.push(...window.geojsonPatches.map(p => p.centroid_lat).filter(v => v !== undefined && !isNaN(v)));
+                allLons.push(...window.geojsonPatches.map(p => p.centroid_lon).filter(v => v !== undefined && !isNaN(v)));
             }
             
-            const centerLat = (Math.max(...allLats) + Math.min(...allLats)) / 2;
-            const centerLon = (Math.max(...allLons) + Math.min(...allLons)) / 2;
+            // Default to hypocenter if no valid coordinates
+            const centerLat = allLats.length > 0 ? (Math.max(...allLats) + Math.min(...allLats)) / 2 : (hypoLat || 0);
+            const centerLon = allLons.length > 0 ? (Math.max(...allLons) + Math.min(...allLons)) / 2 : (hypoLon || 0);
             
             // Build title based on mode
             let mapTitle = 'Fault & Stations Map';
