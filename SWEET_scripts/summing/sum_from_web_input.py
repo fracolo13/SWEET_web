@@ -194,7 +194,29 @@ def sum_waveforms(
     Returns:
         Dictionary with processing statistics
     """
+    import os
+    
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Log configuration
+    print('\n' + '='*80)
+    print('WAVEFORM SUMMATION STARTING')
+    print('='*80)
+    print(f'Templates directory: {templates_dir}')
+    print(f'Output directory: {output_dir}')
+    print(f'Number of subsources: {len(subsources)}')
+    print(f'Number of stations: {len(stations)}')
+    print(f'Number of realizations: {n_realizations}')
+    
+    # Check S3 mode
+    use_s3 = os.getenv('USE_S3_TEMPLATES', 'false').lower() == 'true'
+    print(f'USE_S3_TEMPLATES environment variable: {os.getenv("USE_S3_TEMPLATES", "not set")}')
+    print(f'S3 mode active: {use_s3}')
+    
+    if use_s3:
+        print(f'S3_BUCKET_NAME: {os.getenv("S3_BUCKET_NAME", "not set")}')
+        print(f'S3_TEMPLATES_PREFIX: {os.getenv("S3_TEMPLATES_PREFIX", "not set")}')
+    print('='*80)
     
     # Scan available templates
     print('\nScanning preprocessed templates...')
@@ -210,7 +232,13 @@ def sum_waveforms(
           f'{max(avail_dists) if avail_dists else "n/a"} km)')
     
     if not avail_mags:
-        raise ValueError('No preprocessed templates found in ' + templates_dir)
+        error_msg = f'No preprocessed templates found in {templates_dir}'
+        if use_s3:
+            error_msg += '\n  Check S3 configuration: bucket name, prefix, and credentials'
+        else:
+            error_msg += '\n  Templates directory does not exist or is empty'
+            error_msg += f'\n  Set USE_S3_TEMPLATES=true to use S3 storage'
+        raise ValueError(error_msg)
     
     stats = {
         'num_subsources': len(subsources),
@@ -318,7 +346,24 @@ def sum_waveforms(
         if not traces_dict:
             print('[ERROR] No traces collected! Check template loading.')
             print(f'[ERROR] Attempted {templates_attempted} template loads, all failed.')
-            print(f'[ERROR] Check S3 configuration and credentials if using S3 mode.')
+            print(f'[ERROR] Templates loaded successfully: {templates_loaded}')
+            print(f'[ERROR] Templates failed to load: {templates_failed}')
+            
+            # Provide specific guidance based on mode
+            use_s3 = os.getenv('USE_S3_TEMPLATES', 'false').lower() == 'true'
+            if use_s3:
+                print('[ERROR] S3 mode is ENABLED. Check:')
+                print(f'[ERROR]   - S3_BUCKET_NAME: {os.getenv("S3_BUCKET_NAME", "NOT SET")}')
+                print(f'[ERROR]   - S3_TEMPLATES_PREFIX: {os.getenv("S3_TEMPLATES_PREFIX", "NOT SET")}')
+                print('[ERROR]   - AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)')
+                print('[ERROR]   - boto3 is installed')
+                print('[ERROR]   - Templates exist in S3 bucket')
+            else:
+                print('[ERROR] S3 mode is DISABLED (using local filesystem)')
+                print(f'[ERROR]   - Templates directory: {templates_dir}')
+                print(f'[ERROR]   - Directory exists: {os.path.isdir(templates_dir)}')
+                print('[ERROR]   - Set USE_S3_TEMPLATES=true to use S3')
+            
             raise ValueError(f"No waveforms generated. Check that templates exist for VS30={avail_vs30}, Mag={avail_mags}, Dist={avail_dists}")
         
         # Sum contributions for every (station, channel)

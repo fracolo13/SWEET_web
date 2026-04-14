@@ -384,19 +384,30 @@ async def sum_waveforms_endpoint(params: WaveformSummationInput):
         # Check if S3 mode is enabled
         use_s3 = os.getenv('USE_S3_TEMPLATES', 'false').lower() == 'true'
         
+        logger.info(f"Template configuration:")
+        logger.info(f"  - templates_dir parameter: {templates_dir}")
+        logger.info(f"  - USE_S3_TEMPLATES env: {os.getenv('USE_S3_TEMPLATES', 'not set')}")
+        logger.info(f"  - S3 mode: {use_s3}")
+        
         if use_s3:
             logger.info("Using S3 for template storage")
+            logger.info(f"  - S3_BUCKET_NAME: {os.getenv('S3_BUCKET_NAME', 'NOT SET')}")
+            logger.info(f"  - S3_TEMPLATES_PREFIX: {os.getenv('S3_TEMPLATES_PREFIX', 'NOT SET')}")
             # In S3 mode, templates_dir is just a prefix/path in the bucket
             # No need to check if local directory exists
         else:
             # Local mode: resolve and validate directory
+            logger.info("Using local filesystem for templates")
             if not os.path.isabs(templates_dir):
                 # Convert relative path to absolute (relative to workspace root)
                 templates_dir = str(Path(__file__).parent / templates_dir)
+                logger.info(f"  - Resolved to absolute path: {templates_dir}")
             
             if not os.path.isdir(templates_dir):
+                logger.error(f"Templates directory not found: {templates_dir}")
                 raise HTTPException(status_code=400, 
                                   detail=f"Templates directory not found: {templates_dir}")
+            logger.info(f"  - Directory exists: True")
         
         # Create output directory (use temp dir on server)
         output_dir = tempfile.mkdtemp(prefix="sweet_waveforms_")
