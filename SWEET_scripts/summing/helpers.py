@@ -9,14 +9,24 @@ from typing import Optional, Dict, List, Tuple
 USE_S3_TEMPLATES = os.getenv('USE_S3_TEMPLATES', 'false').lower() == 'true'
 
 if USE_S3_TEMPLATES:
+    print(f"[INFO] S3 template mode requested (USE_S3_TEMPLATES={os.getenv('USE_S3_TEMPLATES')})")
     try:
         from s3_helpers import get_s3_loader, load_template_from_s3
         S3_AVAILABLE = True
-        print("[INFO] S3 template loading enabled")
+        print("[INFO] S3 template loading enabled and imports successful")
+        # Test S3 connection on import
+        try:
+            loader = get_s3_loader()
+            print(f"[INFO] S3 loader initialized: bucket={loader.bucket_name}, prefix={loader.prefix}")
+        except Exception as e:
+            print(f"[WARNING] S3 loader initialization failed: {e}")
     except ImportError as e:
         S3_AVAILABLE = False
         USE_S3_TEMPLATES = False
         print(f"[WARNING] S3 mode requested but import failed: {e}. Falling back to local.")
+else:
+    S3_AVAILABLE = False
+    print("[INFO] S3 template mode disabled, using local filesystem")
 
 
 def moment2magnitude(moment: float) -> float:
@@ -227,7 +237,9 @@ def load_template(
         try:
             # List templates in this bin and pick one based on realization_idx
             loader = get_s3_loader()
+            print(f'[DEBUG S3] Listing templates: {vs30_dir}/{mag_dir}/{dist_dir}')
             available_templates = loader.list_templates(vs30_dir, mag_dir, dist_dir)
+            print(f'[DEBUG S3] Found {len(available_templates)} templates')
             
             if not available_templates:
                 print(f'[WARNING] No templates found in S3: {vs30_dir}/{mag_dir}/{dist_dir}')
@@ -238,10 +250,13 @@ def load_template(
             
             print(f'[DEBUG] Loading from S3: {vs30_dir}/{mag_dir}/{dist_dir}/{template_file}')
             template = load_template_from_s3(vs30_dir, mag_dir, dist_dir, template_file)
-            print(f'[DEBUG] Loaded template shape: {template.shape}')
+            if template is not None:
+                print(f'[DEBUG] Loaded template shape: {template.shape}')
+            else:
+                print(f'[ERROR] Template loaded as None!')
             return template
         except FileNotFoundError as e:
-            print(f'[WARNING] Template not found in S3: {vs30_dir}/{mag_dir}/{dist_dir}')
+            print(f'[WARNING] Template not found in S3: {vs30_dir}/{mag_dir}/{dist_dir} - {e}')
             return None
         except Exception as e:
             print(f'[ERROR] Failed to load template from S3: {e}')

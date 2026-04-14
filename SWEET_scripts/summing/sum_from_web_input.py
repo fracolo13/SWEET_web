@@ -225,6 +225,9 @@ def sum_waveforms(
         print(f'\n── Realisation {real_idx + 1:02d}/{n_realizations} ──')
         
         traces_dict = defaultdict(list)
+        templates_attempted = 0
+        templates_loaded = 0
+        templates_failed = 0
         
         # Subsource loop
         for ss_idx, ss in enumerate(subsources):
@@ -255,6 +258,7 @@ def sum_waveforms(
                 tmpl_dist = find_closest_distance(avail_dists, tmpl_dist)
                 
                 # Load template
+                templates_attempted += 1
                 print(f'[DEBUG] Loading template for {sta_code}: VS30={tmpl_vs30}, Mag={tmpl_mag}, Dist={tmpl_dist}km, Real={real_idx}')
                 envelope = load_template(
                     templates_dir,
@@ -264,9 +268,12 @@ def sum_waveforms(
                 print(f'[DEBUG] Template result for {sta_code}: {"FOUND" if envelope is not None else "NONE"}')
                 
                 if envelope is None:
+                    templates_failed += 1
                     if ss_idx == 0:
                         stats['stations_missing'].add(sta_code)
                     continue
+                
+                templates_loaded += 1
                 
                 if ss_idx == 0:
                     stats['stations_ok'].add(sta_code)
@@ -299,13 +306,19 @@ def sum_waveforms(
                     
                     traces_dict[(str(sta_name)[:5], f'HH{comp_lbl}')].append(tr)
         
+        print(f'\n[SUMMARY] Realization {real_idx + 1}:')
+        print(f'  Templates attempted: {templates_attempted}')
+        print(f'  Templates loaded: {templates_loaded}')
+        print(f'  Templates failed: {templates_failed}')
         print(f'  Templates found for {len(stats["stations_ok"])} stations, '
               f'missing for {len(stats["stations_missing"])} stations.')
-        print(f'[DEBUG] Total traces collected: {sum(len(trs) for trs in traces_dict.values())}')
-        print(f'[DEBUG] Unique (station, channel) pairs: {len(traces_dict)}')
+        print(f'  Total traces collected: {sum(len(trs) for trs in traces_dict.values())}')
+        print(f'  Unique (station, channel) pairs: {len(traces_dict)}')
         
         if not traces_dict:
             print('[ERROR] No traces collected! Check template loading.')
+            print(f'[ERROR] Attempted {templates_attempted} template loads, all failed.')
+            print(f'[ERROR] Check S3 configuration and credentials if using S3 mode.')
             raise ValueError(f"No waveforms generated. Check that templates exist for VS30={avail_vs30}, Mag={avail_mags}, Dist={avail_dists}")
         
         # Sum contributions for every (station, channel)
