@@ -3665,17 +3665,17 @@
         function displayWaveformResults() {
             const stats = currentAnalysisResult.statistics;
             
-            // Show stats grid
-            document.getElementById('waveform-stats').classList.remove('hidden');
-            
-            // Update statistics
+            // Update statistics (validate numbers to prevent NaN)
             document.getElementById('result-magnitude').textContent = 
-                stats.magnitude ? `Mw ${stats.magnitude.toFixed(1)}` : '-';
-            document.getElementById('result-stations').textContent = stats.num_stations;
+                (stats.magnitude && !isNaN(stats.magnitude)) ? `Mw ${stats.magnitude.toFixed(1)}` : '-';
+            document.getElementById('result-stations').textContent = 
+                stats.num_stations || '-';
             document.getElementById('result-max-pga').innerHTML = 
-                `${stats.pga_max.toFixed(3)}<span class="text-sm ml-1">m/s²</span>`;
+                (stats.pga_max && !isNaN(stats.pga_max)) ? 
+                `${stats.pga_max.toFixed(3)}<span class="text-sm ml-1">m/s²</span>` : '-';
             document.getElementById('result-max-pgv').innerHTML = 
-                `${stats.pgv_max.toFixed(4)}<span class="text-sm ml-1">m/s</span>`;
+                (stats.pgv_max && !isNaN(stats.pgv_max)) ?
+                `${stats.pgv_max.toFixed(4)}<span class="text-sm ml-1">m/s</span>` : '-';
             
             // Show downloads section
             document.getElementById('waveform-downloads').classList.remove('hidden');
