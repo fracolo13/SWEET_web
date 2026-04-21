@@ -1727,20 +1727,16 @@
             const strikeRad = strike * Math.PI / 180;
             const dipRad = dip * Math.PI / 180;
             
-            // Fault top edge endpoints (surface trace)
+            // Calculate all 4 projected corners of the fault plane
             const halfLength = length / 2;
             const deltaLat1 = (halfLength * Math.cos(strikeRad)) / 111.0;
             const deltaLon1 = (halfLength * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
-            
-            const faultStart = {
-                lat: hypoLat - deltaLat1,
-                lon: hypoLon - deltaLon1
-            };
-            const faultEnd = {
-                lat: hypoLat + deltaLat1,
-                lon: hypoLon + deltaLon1
-            };
-            
+
+            const perpRad0 = strikeRad - Math.PI / 2;
+            const horizontalDip0 = width * Math.cos(dipRad);
+            const dipOffsetLat0 = (horizontalDip0 * Math.cos(perpRad0)) / 111.0;
+            const dipOffsetLon0 = (horizontalDip0 * Math.sin(perpRad0)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
+
             // Calculate actual hypocenter position based on along-strike and down-dip
             const alongStrikeDist = (hypoAlong - 0.5) * length;  // km from center
             const downDipDist = hypoDown * width;  // km from top
@@ -1759,22 +1755,22 @@
             const actualHypoLon = hypoLon + hypoLonOffset + hypoLonOffsetDip;
             const actualHypoDepth = downDipDist * Math.sin(dipRad);
             
-            // Create fault trace
+            // Create fault projection polygon (all 4 corners of the fault plane)
+            const mfc0lat = hypoLat - deltaLat1,  mfc0lon = hypoLon - deltaLon1;
+            const mfc1lat = hypoLat + deltaLat1,  mfc1lon = hypoLon + deltaLon1;
+            const mfc2lat = mfc1lat + dipOffsetLat0, mfc2lon = mfc1lon + dipOffsetLon0;
+            const mfc3lat = mfc0lat + dipOffsetLat0, mfc3lon = mfc0lon + dipOffsetLon0;
+
             const faultTrace = {
                 type: 'scattermapbox',
-                mode: 'lines+markers',
-                lon: [faultStart.lon, faultEnd.lon],
-                lat: [faultStart.lat, faultEnd.lat],
-                marker: {
-                    size: 10,
-                    color: 'red'
-                },
-                line: {
-                    color: 'red',
-                    width: 4
-                },
-                name: 'Fault Trace',
-                hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
+                mode: 'lines',
+                lon: [mfc0lon, mfc1lon, mfc2lon, mfc3lon, mfc0lon],
+                lat: [mfc0lat, mfc1lat, mfc2lat, mfc3lat, mfc0lat],
+                line: { color: 'rgba(220,50,50,0.9)', width: 3 },
+                fill: 'toself',
+                fillcolor: 'rgba(220,50,50,0.15)',
+                name: 'Fault Projection',
+                hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra>Fault</extra>',
                 showlegend: true
             };
             
@@ -1857,7 +1853,6 @@
 
                 console.log('Generated via API:', stations.length, 'stations');
                 displayStations(stations);
-                updateMapWithStations(stations);
             } catch (error) {
                 console.warn('Backend station generation unavailable, falling back to local generation:', error);
 
@@ -1879,7 +1874,6 @@
                 }
 
                 displayStations(stations);
-                updateMapWithStations(stations);
 
                 if (avoidWater) {
                     alert('Land-only station placement is not available in local fallback mode.');
@@ -1900,7 +1894,6 @@
                         // Try parsing as JSON first
                         const stations = JSON.parse(event.target.result);
                         displayStations(stations);
-                        updateMapWithStations(stations);
                     } catch (err) {
                         // Parse as CSV with header
                         const lines = event.target.result.split('\n').filter(line => line.trim());
@@ -1963,7 +1956,6 @@
                         
                         if (stations.length > 0) {
                             displayStations(stations);
-                            updateMapWithStations(stations);
                         } else {
                             alert('No valid stations found in file. Expected format:\nstation_code,network,latitude,longitude,vs30,distance,elevation');
                         }
@@ -2128,38 +2120,36 @@
                 const strikeRad = strike * Math.PI / 180;
                 const dipRad = dip * Math.PI / 180;
                 
-                // Fault endpoints along strike (top edge)
+                // Calculate all 4 projected corners of the fault plane
                 const halfLength = length / 2;
                 const deltaLat1 = (halfLength * Math.cos(strikeRad)) / 111.0;
                 const deltaLon1 = (halfLength * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
-                
-                const faultStart = {
-                    lat: hypoLat - deltaLat1,
-                    lon: hypoLon - deltaLon1
-                };
-                const faultEnd = {
-                    lat: hypoLat + deltaLat1,
-                    lon: hypoLon + deltaLon1
-                };
-                
+
+                // Down-dip horizontal projection
+                const perpRad2 = strikeRad - Math.PI / 2;
+                const horizontalDip2 = width * Math.cos(dipRad);
+                const dipOffsetLat = (horizontalDip2 * Math.cos(perpRad2)) / 111.0;
+                const dipOffsetLon = (horizontalDip2 * Math.sin(perpRad2)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
+
+                // 4 corners: top-start, top-end, bottom-end, bottom-start, close
+                const fc0lat = hypoLat - deltaLat1,  fc0lon = hypoLon - deltaLon1;
+                const fc1lat = hypoLat + deltaLat1,  fc1lon = hypoLon + deltaLon1;
+                const fc2lat = fc1lat + dipOffsetLat, fc2lon = fc1lon + dipOffsetLon;
+                const fc3lat = fc0lat + dipOffsetLat, fc3lon = fc0lon + dipOffsetLon;
+
                 traces.push({
                     type: 'scattermapbox',
-                    mode: 'lines+markers',
-                    lon: [faultStart.lon, faultEnd.lon],
-                    lat: [faultStart.lat, faultEnd.lat],
-                    marker: {
-                        size: 10,
-                        color: 'red'
-                    },
-                    line: {
-                        color: 'red',
-                        width: 4
-                    },
-                    name: 'Fault Trace',
-                    hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
+                    mode: 'lines',
+                    lon: [fc0lon, fc1lon, fc2lon, fc3lon, fc0lon],
+                    lat: [fc0lat, fc1lat, fc2lat, fc3lat, fc0lat],
+                    line: { color: 'rgba(220,50,50,0.9)', width: 3 },
+                    fill: 'toself',
+                    fillcolor: 'rgba(220,50,50,0.15)',
+                    name: 'Fault Projection',
+                    hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra>Fault</extra>',
                     showlegend: true
                 });
-                
+
                 // Calculate actual hypocenter position
                 const alongStrikeDist = (hypoAlong - 0.5) * length;
                 const downDipDist = hypoDown * width;
