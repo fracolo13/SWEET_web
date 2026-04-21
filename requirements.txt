@@ -8,3 +8,4 @@ boto3>=1.26.0
 obspy>=1.4.0
 pandas>=2.0.0
 matplotlib>=3.7.0
+global-land-mask>=1.0.0

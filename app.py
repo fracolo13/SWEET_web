@@ -11,21 +11,32 @@ import asyncio
 import logging
 import numpy as np
 import os
+import math
 from typing import List, Dict
 
 from models.geometry import GeometryInput, FaultGeometry
 from models.kinematics import KinematicsInput, FaultKinematics
 from models.subsources import SubsourceInput, SubsourceResult
-from models.geojson import GeoJSONFaultModel
 from models.waveforms import WaveformSummationInput, WaveformSummationResult, WaveformAnalysisInput
 from services.geometry_service import generate_fault_geometry
 from services.kinematics_service import generate_fault_kinematics
 from services.grouping_service import compute_subsource_groups
-from services.geojson_service import load_geojson_fault_model, group_geojson_patches
+
+# GeoJSON workflow is disabled by default while focusing on synthetic workflow.
+ENABLE_GEOJSON = os.getenv("ENABLE_GEOJSON", "false").lower() == "true"
+
+if ENABLE_GEOJSON:
+    from services.geojson_service import load_geojson_fault_model, group_geojson_patches
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    from global_land_mask import globe
+    LAND_MASK_AVAILABLE = True
+except Exception:
+    LAND_MASK_AVAILABLE = False
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -64,123 +75,120 @@ async def health_check():
 # GEOJSON ENDPOINTS
 # ========================================
 
-@app.post("/api/geojson/load")
-async def load_geojson(geojson_data: dict):
-    """
-    Load fault model from GeoJSON for kinematics visualization.
-    
-    This endpoint handles:
-    - Parsing GeoJSON finite fault model
-    - Extracting patch centroids, slip, rupture time, moment
-    - Calculating total moment and magnitude
-    - Returns data compatible with kinematics visualization
-    
-    Args:
-        geojson_data: GeoJSON dictionary with fault patches
-        
-    Returns:
-        Fault model formatted for kinematics window visualization
-    """
-    try:
-        logger.info("Loading GeoJSON fault model")
-        
-        fault_model = load_geojson_fault_model(geojson_data)
-        
-        # Calculate grid dimensions (approximate square grid)
-        num_patches = fault_model.num_patches
-        n_along = int(np.ceil(np.sqrt(num_patches)))
-        n_down = int(np.ceil(num_patches / n_along))
-        
-        # Calculate approximate dimensions from patch spread
-        lons = [p.centroid_lon for p in fault_model.patches]
-        lats = [p.centroid_lat for p in fault_model.patches]
-        depths = [p.centroid_depth for p in fault_model.patches]
-        
-        # Approximate dimensions in km (rough estimate)
-        length = (max(lons) - min(lons)) * 111  # degrees to km
-        width = np.sqrt((max(lats) - min(lats))**2 * 111**2 + (max(depths) - min(depths))**2)
-        
-        # Create patches in format expected by frontend
-        patches = []
-        for idx, p in enumerate(fault_model.patches):
-            patches.append({
-                'x': p.centroid_lon,
-                'y': p.centroid_lat,
-                'z': p.centroid_depth,
-                'slip': p.slip,
-                'moment': p.sf_moment,
-                'rupture_time': p.trup,
-                'alongIdx': idx % n_along,
-                'downIdx': idx // n_along
-            })
-        
-        result = {
-            'patches': patches,
-            'totalMoment': fault_model.total_moment,
-            'computedMw': fault_model.computed_mw,
-            'averageSlip': fault_model.total_slip / num_patches,
-            'nAlong': n_along,
-            'nDown': n_down,
-            'length': length,
-            'width': width,
-            'numPatches': num_patches
-        }
-        
-        logger.info(f"Loaded {num_patches} patches, "
-                   f"Mw={fault_model.computed_mw:.2f}, "
-                   f"M0={fault_model.total_moment:.2e} N·m")
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Error loading GeoJSON: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+if ENABLE_GEOJSON:
+    @app.post("/api/geojson/load")
+    async def load_geojson(geojson_data: dict):
+        """
+        Load fault model from GeoJSON for kinematics visualization.
+        """
+        try:
+            logger.info("Loading GeoJSON fault model")
+
+            fault_model = load_geojson_fault_model(geojson_data)
+
+            # Calculate grid dimensions (approximate square grid)
+            num_patches = fault_model.num_patches
+            n_along = int(np.ceil(np.sqrt(num_patches)))
+            n_down = int(np.ceil(num_patches / n_along))
+
+            # Calculate approximate dimensions from patch spread
+            lons = [p.centroid_lon for p in fault_model.patches]
+            lats = [p.centroid_lat for p in fault_model.patches]
+            depths = [p.centroid_depth for p in fault_model.patches]
+
+            # Approximate dimensions in km (rough estimate)
+            length = (max(lons) - min(lons)) * 111  # degrees to km
+            width = np.sqrt((max(lats) - min(lats))**2 * 111**2 + (max(depths) - min(depths))**2)
+
+            # Create patches in format expected by frontend
+            patches = []
+            for idx, p in enumerate(fault_model.patches):
+                patches.append({
+                    'x': p.centroid_lon,
+                    'y': p.centroid_lat,
+                    'z': p.centroid_depth,
+                    'slip': p.slip,
+                    'moment': p.sf_moment,
+                    'rupture_time': p.trup,
+                    'alongIdx': idx % n_along,
+                    'downIdx': idx // n_along
+                })
+
+            result = {
+                'patches': patches,
+                'totalMoment': fault_model.total_moment,
+                'computedMw': fault_model.computed_mw,
+                'averageSlip': fault_model.total_slip / num_patches,
+                'nAlong': n_along,
+                'nDown': n_down,
+                'length': length,
+                'width': width,
+                'numPatches': num_patches
+            }
+
+            logger.info(f"Loaded {num_patches} patches, "
+                        f"Mw={fault_model.computed_mw:.2f}, "
+                        f"M0={fault_model.total_moment:.2e} N·m")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error loading GeoJSON: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/geojson/group")
-async def group_geojson(
-    geojson_data: dict,
-    target_magnitude: float = 6.0,
-    lat_ref: float = None
-):
-    """
-    Load GeoJSON and group patches into subsources.
-    
-    This endpoint combines loading and grouping in one step,
-    allowing direct navigation to subsources page.
-    
-    Args:
-        geojson_data: GeoJSON dictionary with fault patches
-        target_magnitude: Target magnitude for each subsource
-        lat_ref: Reference latitude for coordinate normalization (optional)
-        
-    Returns:
-        Dictionary with fault model, grouped subsources, and statistics
-    """
-    try:
-        logger.info(f"Loading and grouping GeoJSON with target Mw={target_magnitude}")
-        
-        # Load fault model
-        fault_model = load_geojson_fault_model(geojson_data)
-        
-        # Group patches
-        grouped_result = group_geojson_patches(
-            patches=fault_model.patches,
-            target_magnitude=target_magnitude,
-            lat_ref=lat_ref
+    @app.post("/api/geojson/group")
+    async def group_geojson(
+        geojson_data: dict,
+        target_magnitude: float = 6.0,
+        lat_ref: float = None
+    ):
+        """
+        Load GeoJSON and group patches into subsources.
+        """
+        try:
+            logger.info(f"Loading and grouping GeoJSON with target Mw={target_magnitude}")
+
+            # Load fault model
+            fault_model = load_geojson_fault_model(geojson_data)
+
+            # Group patches
+            grouped_result = group_geojson_patches(
+                patches=fault_model.patches,
+                target_magnitude=target_magnitude,
+                lat_ref=lat_ref
+            )
+
+            logger.info(f"Created {grouped_result['num_groups']} subsources from "
+                        f"{grouped_result['original_patches']} patches")
+
+            return {
+                'fault_model': fault_model.dict(),
+                'subsources': grouped_result
+            }
+
+        except Exception as e:
+            logger.error(f"Error processing GeoJSON: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+else:
+    @app.post("/api/geojson/load")
+    async def load_geojson(geojson_data: dict):
+        raise HTTPException(
+            status_code=503,
+            detail="GeoJSON workflow is disabled. Set ENABLE_GEOJSON=true to re-enable."
         )
-        
-        logger.info(f"Created {grouped_result['num_groups']} subsources from "
-                   f"{grouped_result['original_patches']} patches")
-        
-        return {
-            'fault_model': fault_model.dict(),
-            'subsources': grouped_result
-        }
-        
-    except Exception as e:
-        logger.error(f"Error processing GeoJSON: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+
+
+    @app.post("/api/geojson/group")
+    async def group_geojson(
+        geojson_data: dict,
+        target_magnitude: float = 6.0,
+        lat_ref: float = None
+    ):
+        raise HTTPException(
+            status_code=503,
+            detail="GeoJSON workflow is disabled. Set ENABLE_GEOJSON=true to re-enable."
+        )
 
 
 # ========================================
@@ -331,6 +339,78 @@ async def group_subsources(
         
     except Exception as e:
         logger.error(f"Error grouping subsources: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========================================
+# STATION ENDPOINTS
+# ========================================
+
+@app.post("/api/stations/generate")
+async def generate_stations_endpoint(params: dict):
+    """
+    Generate random stations around a hypocenter.
+
+    Optional land-only filtering uses global_land_mask when available.
+    """
+    try:
+        num_stations = int(params.get("num_stations", 10))
+        max_distance = float(params.get("max_distance", 200.0))
+        hypo_lat = float(params.get("hypo_lat", 35.0))
+        hypo_lon = float(params.get("hypo_lon", -118.0))
+        avoid_water = bool(params.get("avoid_water", True))
+
+        if num_stations < 1 or num_stations > 500:
+            raise HTTPException(status_code=400, detail="num_stations must be between 1 and 500")
+        if max_distance <= 0:
+            raise HTTPException(status_code=400, detail="max_distance must be > 0")
+
+        # Allow extra draws for offshore regions where water filtering may reject many points.
+        max_attempts = max(1000, num_stations * 60)
+        stations = []
+        attempts = 0
+
+        while len(stations) < num_stations and attempts < max_attempts:
+            attempts += 1
+
+            angle = np.random.random() * 2.0 * np.pi
+            distance = np.sqrt(np.random.random()) * max_distance
+
+            delta_lat = (distance * math.cos(angle)) / 111.0
+            delta_lon = (distance * math.sin(angle)) / (111.0 * math.cos(math.radians(hypo_lat)))
+
+            lat = hypo_lat + delta_lat
+            lon = hypo_lon + delta_lon
+
+            if avoid_water and LAND_MASK_AVAILABLE:
+                if not globe.is_land(lat, lon):
+                    continue
+
+            stations.append({
+                "name": f"ST{len(stations) + 1:03d}",
+                "lat": float(lat),
+                "lon": float(lon),
+                "distance": float(round(distance, 1))
+            })
+
+        return {
+            "stations": stations,
+            "requested": num_stations,
+            "generated": len(stations),
+            "attempts": attempts,
+            "avoid_water": avoid_water,
+            "land_mask_available": LAND_MASK_AVAILABLE,
+            "warning": (
+                "Could not place all stations on land with current settings. "
+                "Try increasing max distance or disable water filtering."
+                if len(stations) < num_stations and avoid_water and LAND_MASK_AVAILABLE
+                else None
+            )
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating stations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
