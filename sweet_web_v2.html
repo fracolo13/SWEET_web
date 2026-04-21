@@ -1767,11 +1767,33 @@
                 lon: [mfc0lon, mfc1lon, mfc2lon, mfc3lon, mfc0lon],
                 lat: [mfc0lat, mfc1lat, mfc2lat, mfc3lat, mfc0lat],
                 line: { color: 'rgba(220,50,50,0.9)', width: 3 },
-                fill: 'toself',
-                fillcolor: 'rgba(220,50,50,0.15)',
                 name: 'Fault Projection',
                 hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra>Fault</extra>',
                 showlegend: true
+            };
+
+            // GeoJSON polygon for filled fault area (mapbox layer)
+            const faultGeoJSON = {
+                type: 'FeatureCollection',
+                features: [{ type: 'Feature', geometry: {
+                    type: 'Polygon',
+                    coordinates: [[[mfc0lon,mfc0lat],[mfc1lon,mfc1lat],[mfc2lon,mfc2lat],[mfc3lon,mfc3lat],[mfc0lon,mfc0lat]]]
+                }}]
+            };
+
+            const faultFillLayer = {
+                sourcetype: 'geojson',
+                source: faultGeoJSON,
+                type: 'fill',
+                color: 'rgba(220,50,50,0.20)'
+            };
+
+            const faultLineLayer = {
+                sourcetype: 'geojson',
+                source: faultGeoJSON,
+                type: 'line',
+                color: 'rgba(220,50,50,0.9)',
+                line: { width: 3 }
             };
             
             // Add hypocenter marker at actual position
@@ -1795,11 +1817,9 @@
             const layout = {
                 mapbox: {
                     style: 'open-street-map',
-                    center: {
-                        lat: hypoLat,
-                        lon: hypoLon
-                    },
-                    zoom: 8
+                    center: { lat: hypoLat, lon: hypoLon },
+                    zoom: 8,
+                    layers: [faultFillLayer, faultLineLayer]
                 },
                 title: 'Fault Location Map',
                 showlegend: true,
@@ -2143,12 +2163,19 @@
                     lon: [fc0lon, fc1lon, fc2lon, fc3lon, fc0lon],
                     lat: [fc0lat, fc1lat, fc2lat, fc3lat, fc0lat],
                     line: { color: 'rgba(220,50,50,0.9)', width: 3 },
-                    fill: 'toself',
-                    fillcolor: 'rgba(220,50,50,0.15)',
                     name: 'Fault Projection',
                     hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra>Fault</extra>',
                     showlegend: true
                 });
+
+                // Build GeoJSON polygon for fault fill (added as mapbox layer below)
+                window._faultPolygonGeoJSON = {
+                    type: 'FeatureCollection',
+                    features: [{ type: 'Feature', geometry: {
+                        type: 'Polygon',
+                        coordinates: [[[fc0lon,fc0lat],[fc1lon,fc1lat],[fc2lon,fc2lat],[fc3lon,fc3lat],[fc0lon,fc0lat]]]
+                    }}]
+                };
 
                 // Calculate actual hypocenter position
                 const alongStrikeDist = (hypoAlong - 0.5) * length;
@@ -2172,11 +2199,7 @@
                     mode: 'markers',
                     lon: [actualHypoLon],
                     lat: [actualHypoLat],
-                    marker: {
-                        size: 18,
-                        color: '#FFD700',
-                        symbol: 'star'
-                    },
+                    marker: { size: 18, color: '#FFD700' },
                     name: '⭐ Hypocenter',
                     hovertemplate: `Hypocenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<br>Depth: ${actualHypoDepth.toFixed(1)} km<extra></extra>`,
                     showlegend: true
@@ -2191,11 +2214,7 @@
                     mode: 'markers',
                     lon: [hypoLon],
                     lat: [hypoLat],
-                    marker: {
-                        size: 18,
-                        color: '#FFD700',
-                        symbol: 'star'
-                    },
+                    marker: { size: 18, color: '#FFD700' },
                     name: '⭐ Epicenter',
                     hovertemplate: 'Epicenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
                     showlegend: true
@@ -2229,13 +2248,8 @@
                 lon: stationLons,
                 lat: stationLats,
                 marker: {
-                    size: 11,
-                    color: '#00CED1',
-                    symbol: 'triangle',
-                    line: {
-                        color: '#006B7D',
-                        width: 1.5
-                    }
+                    size: 10,
+                    color: '#00CED1'
                 },
                 hovertext: hoverText,
                 hoverinfo: 'text',
@@ -2262,6 +2276,16 @@
                 mapTitle = `${window.eventMetadata.eventid} - Mw ${window.eventMetadata.magnitude} ${window.eventMetadata.location}`;
             }
             
+            const mapboxLayers = [];
+            if (window._faultPolygonGeoJSON) {
+                mapboxLayers.push({
+                    sourcetype: 'geojson',
+                    source: window._faultPolygonGeoJSON,
+                    type: 'fill',
+                    color: 'rgba(220,50,50,0.20)'
+                });
+            }
+
             const layout = {
                 title: {
                     text: mapTitle,
@@ -2269,20 +2293,16 @@
                 },
                 mapbox: {
                     style: 'open-street-map',
-                    center: {
-                        lat: centerLat,
-                        lon: centerLon
-                    },
-                    zoom: 7
+                    center: { lat: centerLat, lon: centerLon },
+                    zoom: 7,
+                    layers: mapboxLayers
                 },
                 showlegend: true,
                 legend: {
-                    x: 0.01,
-                    y: 0.99,
-                    xanchor: 'left',
-                    yanchor: 'top',
-                    bgcolor: 'rgba(255, 255, 255, 0.9)',
-                    bordercolor: 'rgba(0, 0, 0, 0.2)',
+                    x: 0.01, y: 0.99,
+                    xanchor: 'left', yanchor: 'top',
+                    bgcolor: 'rgba(255,255,255,0.9)',
+                    bordercolor: 'rgba(0,0,0,0.2)',
                     borderwidth: 1,
                     font: { size: 11 }
                 },
