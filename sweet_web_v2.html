@@ -2016,6 +2016,9 @@
             stationList.classList.remove('hidden');
             // Show waveform configuration section now that stations are loaded
             document.getElementById('waveform-config').classList.remove('hidden');
+            
+            // Update spatial map visualization in main panel
+            visualizeSpatialMap();
         }
         
         // Visualize fault and stations on spatial setup panel
@@ -2025,12 +2028,8 @@
             
             // Check if we have stations
             if (!window.stationsData || window.stationsData.length === 0) {
-                document.getElementById('spatial-map-container').classList.add('hidden');
                 return;
             }
-            
-            // Show map container
-            document.getElementById('spatial-map-container').classList.remove('hidden');
             
             // Get hypocenter position from kinematics if available
             const hypoAlong = window.globalKinematicsResult ? window.globalKinematicsResult.hypo_along : 0.5;
@@ -2300,7 +2299,7 @@
                 margin: {l: 0, r: 0, t: 35, b: 0}
             };
             
-            Plotly.newPlot('spatial-map', traces, layout, {responsive: true});
+            Plotly.newPlot('plot-container', traces, layout, {responsive: true});
         }
         
         // Update visualization based on dropdown selection
