@@ -1112,7 +1112,11 @@
                     n_along: faultData.nAlong,
                     n_down: faultData.nDown,
                     computed_mw: faultData.computedMw,
-                    total_moment: faultData.totalMoment
+                    total_moment: faultData.totalMoment,
+                    hypo_along: faultData.hypoAlong,
+                    hypo_down: faultData.hypoDown,
+                    hypo_i: hypoI,
+                    hypo_j: hypoJ
                 };
             }
             
@@ -1724,10 +1728,15 @@
             const width = faultData.width;
             const dip = faultData.dip;
             
+            // Get hypocenter position from kinematics if available
+            const hypoAlong = window.globalKinematicsResult ? window.globalKinematicsResult.hypo_along : 0.5;
+            const hypoDown = window.globalKinematicsResult ? window.globalKinematicsResult.hypo_down : 0.5;
+            
             // Calculate fault trace on surface
             const strikeRad = strike * Math.PI / 180;
+            const dipRad = dip * Math.PI / 180;
             
-            // Fault endpoints along strike
+            // Fault top edge endpoints (surface trace)
             const halfLength = length / 2;
             const deltaLat1 = (halfLength * Math.cos(strikeRad)) / 111.0;
             const deltaLon1 = (halfLength * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
@@ -1740,6 +1749,24 @@
                 lat: hypoLat + deltaLat1,
                 lon: hypoLon + deltaLon1
             };
+            
+            // Calculate actual hypocenter position based on along-strike and down-dip
+            const alongStrikeDist = (hypoAlong - 0.5) * length;  // km from center
+            const downDipDist = hypoDown * width;  // km from top
+            
+            // Along-strike offset from center
+            const hypoLatOffset = (alongStrikeDist * Math.cos(strikeRad)) / 111.0;
+            const hypoLonOffset = (alongStrikeDist * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
+            
+            // Down-dip offset (perpendicular to strike, dipping down)
+            const perpStrike = strikeRad - Math.PI / 2;  // perpendicular direction
+            const horizontalDownDip = downDipDist * Math.cos(dipRad);  // horizontal component
+            const hypoLatOffsetDip = (horizontalDownDip * Math.cos(perpStrike)) / 111.0;
+            const hypoLonOffsetDip = (horizontalDownDip * Math.sin(perpStrike)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
+            
+            const actualHypoLat = hypoLat + hypoLatOffset + hypoLatOffsetDip;
+            const actualHypoLon = hypoLon + hypoLonOffset + hypoLonOffsetDip;
+            const actualHypoDepth = downDipDist * Math.sin(dipRad);
             
             // Create fault trace
             const faultTrace = {
@@ -1755,24 +1782,24 @@
                     color: 'red',
                     width: 4
                 },
-                name: 'Fault',
+                name: 'Fault Trace',
                 hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
                 showlegend: true
             };
             
-            // Add hypocenter marker - large bright yellow circle
+            // Add hypocenter marker at actual position
             const hypocenter = {
                 type: 'scattermapbox',
                 mode: 'markers',
-                lon: [hypoLon],
-                lat: [hypoLat],
+                lon: [actualHypoLon],
+                lat: [actualHypoLat],
                 marker: {
                     size: 18,
                     color: '#FFD700',
                     opacity: 1
                 },
                 name: '⭐ Hypocenter',
-                hovertemplate: 'Hypocenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
+                hovertemplate: `Hypocenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<br>Depth: ${actualHypoDepth.toFixed(1)} km<extra></extra>`,
                 showlegend: true
             };
             
@@ -2017,6 +2044,10 @@
             // Show map container
             document.getElementById('spatial-map-container').classList.remove('hidden');
             
+            // Get hypocenter position from kinematics if available
+            const hypoAlong = window.globalKinematicsResult ? window.globalKinematicsResult.hypo_along : 0.5;
+            const hypoDown = window.globalKinematicsResult ? window.globalKinematicsResult.hypo_down : 0.5;
+            
             // Prepare traces
             const traces = [];
             
@@ -2102,12 +2133,15 @@
                     });
                 }
             } else {
-                // Use synthetic fault geometry
+                // Use synthetic fault geometry with actual hypocenter position
                 const strike = parseFloat(document.getElementById('strike').value);
                 const length = faultData.length;
+                const width = faultData.width;
+                const dip = faultData.dip;
                 const strikeRad = strike * Math.PI / 180;
+                const dipRad = dip * Math.PI / 180;
                 
-                // Fault endpoints along strike
+                // Fault endpoints along strike (top edge)
                 const halfLength = length / 2;
                 const deltaLat1 = (halfLength * Math.cos(strikeRad)) / 111.0;
                 const deltaLon1 = (halfLength * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
@@ -2134,27 +2168,62 @@
                         color: 'red',
                         width: 4
                     },
-                    name: 'Fault',
+                    name: 'Fault Trace',
                     hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
+                    showlegend: true
+                });
+                
+                // Calculate actual hypocenter position
+                const alongStrikeDist = (hypoAlong - 0.5) * length;
+                const downDipDist = hypoDown * width;
+                
+                const hypoLatOffset = (alongStrikeDist * Math.cos(strikeRad)) / 111.0;
+                const hypoLonOffset = (alongStrikeDist * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
+                
+                const perpStrike = strikeRad - Math.PI / 2;
+                const horizontalDownDip = downDipDist * Math.cos(dipRad);
+                const hypoLatOffsetDip = (horizontalDownDip * Math.cos(perpStrike)) / 111.0;
+                const hypoLonOffsetDip = (horizontalDownDip * Math.sin(perpStrike)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
+                
+                const actualHypoLat = hypoLat + hypoLatOffset + hypoLatOffsetDip;
+                const actualHypoLon = hypoLon + hypoLonOffset + hypoLonOffsetDip;
+                const actualHypoDepth = downDipDist * Math.sin(dipRad);
+                
+                // Add actual hypocenter marker
+                traces.push({
+                    type: 'scattermapbox',
+                    mode: 'markers',
+                    lon: [actualHypoLon],
+                    lat: [actualHypoLat],
+                    marker: {
+                        size: 18,
+                        color: '#FFD700',
+                        symbol: 'star'
+                    },
+                    name: '⭐ Hypocenter',
+                    hovertemplate: `Hypocenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<br>Depth: ${actualHypoDepth.toFixed(1)} km<extra></extra>`,
                     showlegend: true
                 });
             }
             
-            // Add hypocenter marker
-            traces.push({
-                type: 'scattermapbox',
-                mode: 'markers',
-                lon: [hypoLon],
-                lat: [hypoLat],
-                marker: {
-                    size: 18,
-                    color: '#FFD700',
-                    symbol: 'star'
-                },
-                name: '⭐ Epicenter',
-                hovertemplate: 'Epicenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
-                showlegend: true
-            });
+            // Don't add a separate epicenter marker if we already added hypocenter above
+            if (!(window.globalKinematicsResult && !window.isGeoJSONMode)) {
+                // Add generic epicenter marker for GeoJSON mode
+                traces.push({
+                    type: 'scattermapbox',
+                    mode: 'markers',
+                    lon: [hypoLon],
+                    lat: [hypoLat],
+                    marker: {
+                        size: 18,
+                        color: '#FFD700',
+                        symbol: 'star'
+                    },
+                    name: '⭐ Epicenter',
+                    hovertemplate: 'Epicenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
+                    showlegend: true
+                });
+            }
             
             // Add station markers
             const validStations = window.stationsData.filter(s => 
@@ -3785,8 +3854,9 @@
                 let titlePrefix;
                 if (window.isGeoJSONMode && window.eventMetadata) {
                     titlePrefix = `${window.eventMetadata.eventid} - Mw ${window.eventMetadata.magnitude.toFixed(1)} ${window.eventMetadata.location}`;
-                } else if (globalKinematicsResult && globalKinematicsResult.computed_mw) {
-                    titlePrefix = `Mw ${globalKinematicsResult.computed_mw.toFixed(1)} Event`;
+                } else if (faultData && faultData.magnitude) {
+                    // Use the defined/target magnitude, not the computed one
+                    titlePrefix = `Mw ${faultData.magnitude.toFixed(1)} Event`;
                 } else {
                     titlePrefix = 'Synthetic Event';
                 }

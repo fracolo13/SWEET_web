@@ -24,8 +24,16 @@ from scipy.interpolate import griddata
 from obspy import read
 import json
 import base64
+import io
 from typing import Dict, List, Optional, Tuple
 import sys
+
+# Try to import plotly for interactive shakemap
+try:
+    import plotly.graph_objects as go
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
 
 # Import helpers
 sys.path.insert(0, os.path.dirname(__file__))
@@ -288,7 +296,7 @@ def plot_shakemap(
     title: str = "PGA Shakemap"
 ) -> str:
     """
-    Generate spatial PGA shakemap.
+    Generate spatial PGA shakemap overlaid on a map.
     
     Args:
         analysis_df: DataFrame from analyze_waveforms()
@@ -303,6 +311,166 @@ def plot_shakemap(
     if analysis_df.empty:
         return None
     
+    # Convert PGA to %g
+    pga_ms2 = analysis_df['pga_h'].values
+    pga_pctg = pga_ms2 / 9.81 * 100.0
+    
+    if PLOTLY_AVAILABLE:
+        # Use Plotly for interactive map-based shakemap
+        # USGS-style PGA levels and colors
+        pga_levels = [0, 0.046, 0.3, 2.76, 6.2, 11.5, 21.5, 40.1, 74.7, 139, 500]
+        usgs_colors = ['#FFFFFF', '#BFCCFF', '#A0E6FF', '#80FFFF', '#7DF894',
+                       '#FFFF00', '#FFAA00', '#FF8033', '#CC3300', '#880000']
+        
+        # Grid extent
+        margin = 0.3
+        lon_min = analysis_df['lon'].min() - margin
+        lon_max = analysis_df['lon'].max() + margin
+        lat_min = analysis_df['lat'].min() - margin
+        lat_max = analysis_df['lat'].max() + margin
+        
+        # Interpolate PGA on a grid
+        glon = np.linspace(lon_min, lon_max, 120)
+        glat = np.linspace(lat_min, lat_max, 120)
+        glo, gla = np.meshgrid(glon, glat)
+        
+        pts = analysis_df[['lon', 'lat']].values
+        
+        # Check for colinear data
+        lat_range = analysis_df['lat'].max() - analysis_df['lat'].min()
+        lon_range = analysis_df['lon'].max() - analysis_df['lon'].min()
+        is_colinear = (lat_range < 0.01 or lon_range < 0.01)
+        
+        if is_colinear or len(analysis_df) < 4:
+            grid = griddata(pts, pga_pctg, (glo, gla), method='nearest', fill_value=0.0)
+        else:
+            grid = griddata(pts, pga_pctg, (glo, gla), method='cubic', fill_value=0.0)
+        
+        grid = np.clip(grid, 0, 500)
+        
+        # Create plotly figure with mapbox
+        fig = go.Figure()
+        
+        # Add contour layer
+        fig.add_trace(go.Contour(
+            x=glon,
+            y=glat,
+            z=grid,
+            colorscale=list(zip(
+                np.linspace(0, 1, len(usgs_colors)),
+                usgs_colors
+            )),
+            contours=dict(
+                start=0,
+                end=500,
+                size=20,
+                showlabels=True,
+                labelfont=dict(size=9, color='white')
+            ),
+            colorbar=dict(
+                title="PGA (%g)",
+                thickness=20,
+                len=0.7,
+                x=1.02
+            ),
+            hovertemplate='Lon: %{x:.4f}°<br>Lat: %{y:.4f}°<br>PGA: %{z:.2f} %g<extra></extra>',
+            opacity=0.7,
+            name='PGA Interpolation'
+        ))
+        
+        # Add station markers
+        fig.add_trace(go.Scatter(
+            x=analysis_df['lon'],
+            y=analysis_df['lat'],
+            mode='markers',
+            marker=dict(
+                size=8,
+                color=pga_pctg,
+                colorscale=list(zip(
+                    np.linspace(0, 1, len(usgs_colors)),
+                    usgs_colors
+                )),
+                cmin=0,
+                cmax=500,
+                line=dict(color='black', width=1),
+                showscale=False
+            ),
+            text=[f"Station: {row['station']}<br>PGA: {pga:.2f} %g" 
+                  for _, row in analysis_df.iterrows() 
+                  for pga in [row['pga_h'] / 9.81 * 100]],
+            hoverinfo='text',
+            name='Stations'
+        ))
+        
+        # Add hypocenter
+        fig.add_trace(go.Scatter(
+            x=[hypo_lon],
+            y=[hypo_lat],
+            mode='markers',
+            marker=dict(
+                size=16,
+                color='red',
+                symbol='star',
+                line=dict(color='black', width=2)
+            ),
+            text=[f'Hypocenter<br>Lon: {hypo_lon:.4f}°<br>Lat: {hypo_lat:.4f}°'],
+            hoverinfo='text',
+            name='Hypocenter'
+        ))
+        
+        # Add fault outline if provided
+        if fault_outline:
+            flo_min, flo_max, fla_min, fla_max = fault_outline
+            fig.add_trace(go.Scatter(
+                x=[flo_min, flo_max, flo_max, flo_min, flo_min],
+                y=[fla_min, fla_min, fla_max, fla_max, fla_min],
+                mode='lines',
+                line=dict(color='darkred', width=3, dash='dash'),
+                hoverinfo='skip',
+                name='Fault Extent'
+            ))
+        
+        # Update layout to use mapbox
+        center_lat = (lat_min + lat_max) / 2
+        center_lon = (lon_min + lon_max) / 2
+        
+        fig.update_layout(
+            title=dict(
+                text=title,
+                font=dict(size=16, color='#1f2937')
+            ),
+            mapbox=dict(
+                style='open-street-map',
+                center=dict(lat=center_lat, lon=center_lon),
+                zoom=8
+            ),
+            showlegend=True,
+            legend=dict(
+                x=0.01,
+                y=0.99,
+                xanchor='left',
+                yanchor='top',
+                bgcolor='rgba(255, 255, 255, 0.9)',
+                bordercolor='rgba(0, 0, 0, 0.2)',
+                borderwidth=1
+            ),
+            width=1200,
+            height=900,
+            margin=dict(l=0, r=100, t=60, b=0)
+        )
+        
+        # Convert to static image using kaleido if available
+        try:
+            img_bytes = fig.to_image(format='png', width=1200, height=900)
+            with open(output_file, 'wb') as f:
+                f.write(img_bytes)
+            return output_file
+        except Exception as e:
+            print(f"[WARNING] Could not export Plotly figure to PNG: {e}")
+            print("[INFO] Falling back to matplotlib shakemap")
+            # Fall through to matplotlib version
+    
+    # Fallback: matplotlib version (original)
     # USGS-style PGA colormap
     pga_levels = [0, 0.046, 0.3, 2.76, 6.2, 11.5, 21.5, 40.1, 74.7, 139, 500]
     usgs_colors = ['#FFFFFF', '#BFCCFF', '#A0E6FF', '#80FFFF', '#7DF894',
@@ -323,8 +491,6 @@ def plot_shakemap(
     glo, gla = np.meshgrid(glon, glat)
     
     pts = analysis_df[['lon', 'lat']].values
-    vals = analysis_df['pga_h'].values
-    pga_pctg = vals / 9.81 * 100.0  # Convert to %g
     
     # Check for colinear data
     lat_range = analysis_df['lat'].max() - analysis_df['lat'].min()
