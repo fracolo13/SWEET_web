@@ -32,6 +32,7 @@ import json
 import argparse
 import numpy as np
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from obspy import Stream, Trace
 from obspy.core import UTCDateTime
 
@@ -43,6 +44,65 @@ from helpers import (
     find_closest_magnitude, find_closest_vs30, find_closest_distance,
     get_available_templates_info, load_template,
 )
+
+
+def _process_pair(args):
+    """
+    Process one (subsource, station) pair and return trace data.
+    Designed to be called from a ThreadPoolExecutor.
+    """
+    (ss, ss_idx, sta,
+     avail_mags, avail_vs30, avail_dists,
+     templates_dir, real_idx, min_template_dist_km,
+     moment_scale, amplitude_scale, sampling_rate) = args
+
+    ss_mag   = ss['magnitude']
+    ss_trup  = ss['trup']
+    ss_lon   = ss['centroid_lon']
+    ss_lat   = ss['centroid_lat']
+
+    tmpl_mag = find_closest_magnitude(avail_mags, ss_mag)
+
+    sta_code = sta['station_code']
+    sta_name = sta['station']
+    net_code = sta['network']
+    sta_lat  = sta['latitude']
+    sta_lon  = sta['longitude']
+    sta_vs30 = sta['vs30']
+
+    dist_km  = haversine_distance(ss_lon, ss_lat, sta_lon, sta_lat)
+    tmpl_vs30 = find_closest_vs30(avail_vs30, sta_vs30)
+    tmpl_dist = max(dist_km, min_template_dist_km)
+    tmpl_dist = find_closest_distance(avail_dists, tmpl_dist)
+
+    envelope = load_template(templates_dir, tmpl_vs30, tmpl_mag, tmpl_dist, real_idx)
+
+    if envelope is None:
+        return None, sta_code, ss_idx, dist_km
+
+    if moment_scale:
+        m0_sub  = float(ss['sf_moment'])
+        m0_tmpl = magnitude2moment(tmpl_mag)
+        scale   = (m0_sub / m0_tmpl) * amplitude_scale
+    else:
+        scale = amplitude_scale
+
+    traces = []
+    for comp_i, comp_lbl in enumerate(['E', 'N', 'Z']):
+        tr = Trace()
+        tr.data = envelope[comp_i, :].copy() * scale
+        tr.stats.network        = str(net_code)[:2]
+        tr.stats.station        = str(sta_name)[:5]
+        tr.stats.location       = '00'
+        tr.stats.channel        = f'HH{comp_lbl}'
+        tr.stats.sampling_rate  = sampling_rate
+        tr.stats.starttime      = UTCDateTime(0) + float(ss_trup)
+        tr.stats.distance       = dist_km
+        tr.stats.vs30           = float(sta_vs30)
+        tr.stats.full_station_code = sta_code
+        traces.append(((str(sta_name)[:5], f'HH{comp_lbl}'), tr))
+
+    return traces, sta_code, ss_idx, dist_km
 
 
 def load_subsources_from_json(subsources_data):
@@ -249,88 +309,41 @@ def sum_waveforms(
     }
     
     # Realization loop
+    n_workers = min(32, (os.cpu_count() or 1) * 4)
+    print(f'Using {n_workers} worker threads for template loading')
+
     for real_idx in range(n_realizations):
         print(f'\n── Realisation {real_idx + 1:02d}/{n_realizations} ──')
-        
+
+        # Build flat list of (subsource, station) tasks
+        args_list = [
+            (ss, ss_idx, sta,
+             avail_mags, avail_vs30, avail_dists,
+             templates_dir, real_idx, min_template_dist_km,
+             moment_scale, amplitude_scale, sampling_rate)
+            for ss_idx, ss in enumerate(subsources)
+            for sta in stations
+        ]
+
         traces_dict = defaultdict(list)
-        templates_attempted = 0
+        templates_attempted = len(args_list)
         templates_loaded = 0
         templates_failed = 0
-        
-        # Subsource loop
-        for ss_idx, ss in enumerate(subsources):
-            ss_mag = ss['magnitude']
-            ss_trup = ss['trup']
-            ss_lon = ss['centroid_lon']
-            ss_lat = ss['centroid_lat']
-            
-            tmpl_mag = find_closest_magnitude(avail_mags, ss_mag)
-            
-            # Station loop
-            for sta in stations:
-                sta_code = sta['station_code']
-                sta_name = sta['station']
-                net_code = sta['network']
-                sta_lat = sta['latitude']
-                sta_lon = sta['longitude']
-                sta_vs30 = sta['vs30']
-                
-                # Calculate distance
-                dist_km = haversine_distance(ss_lon, ss_lat, sta_lon, sta_lat)
-                tmpl_vs30 = find_closest_vs30(avail_vs30, sta_vs30)
-                
-                # Clamp near-field distances
-                tmpl_dist = max(dist_km, min_template_dist_km)
-                
-                # Find closest available distance bin
-                tmpl_dist = find_closest_distance(avail_dists, tmpl_dist)
-                
-                # Load template (cached S3 listing makes this fast)
-                templates_attempted += 1
-                envelope = load_template(
-                    templates_dir,
-                    tmpl_vs30, tmpl_mag, tmpl_dist, real_idx
-                )
-                
-                if envelope is None:
+
+        with ThreadPoolExecutor(max_workers=n_workers) as executor:
+            for result in executor.map(_process_pair, args_list):
+                result_traces, sta_code, ss_idx, dist_km = result
+                if result_traces is None:
                     templates_failed += 1
                     if ss_idx == 0:
                         stats['stations_missing'].add(sta_code)
-                    continue
-                
-                templates_loaded += 1
-                
-                if ss_idx == 0:
-                    stats['stations_ok'].add(sta_code)
-                
-                # Optional moment-ratio scaling
-                if moment_scale:
-                    m0_sub = float(ss['sf_moment'])
-                    m0_tmpl = magnitude2moment(tmpl_mag)
-                    moment_ratio = m0_sub / m0_tmpl
                 else:
-                    moment_ratio = 1.0
-                
-                scale = moment_ratio * amplitude_scale
-                
-                # Create traces for each component
-                for comp_i, comp_lbl in enumerate(['E', 'N', 'Z']):
-                    tr = Trace()
-                    tr.data = envelope[comp_i, :].copy() * scale
-                    tr.stats.network = str(net_code)[:2]
-                    tr.stats.station = str(sta_name)[:5]
-                    tr.stats.location = '00'
-                    tr.stats.channel = f'HH{comp_lbl}'
-                    tr.stats.sampling_rate = sampling_rate
-                    tr.stats.starttime = UTCDateTime(0) + float(ss_trup)
-                    
-                    # Preserve metadata
-                    tr.stats.distance = dist_km
-                    tr.stats.vs30 = float(sta_vs30)
-                    tr.stats.full_station_code = sta_code
-                    
-                    traces_dict[(str(sta_name)[:5], f'HH{comp_lbl}')].append(tr)
-        
+                    templates_loaded += 1
+                    if ss_idx == 0:
+                        stats['stations_ok'].add(sta_code)
+                    for key, tr in result_traces:
+                        traces_dict[key].append(tr)
+
         print(f'\n[SUMMARY] Realization {real_idx + 1}:')
         print(f'  Templates attempted: {templates_attempted}')
         print(f'  Templates loaded: {templates_loaded}')

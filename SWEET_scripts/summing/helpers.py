@@ -3,6 +3,7 @@ Helper functions for synthetic waveform summation.
 """
 import os
 import numpy as np
+from functools import lru_cache
 from typing import Optional, Dict, List, Tuple
 
 # Check if S3 mode is enabled
@@ -206,6 +207,7 @@ def get_available_templates_info(templates_dir: str) -> Dict[str, List]:
     return info
 
 
+@lru_cache(maxsize=4096)
 def load_template(
     templates_dir: str,
     vs30: float,

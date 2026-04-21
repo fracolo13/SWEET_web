@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pathlib import Path
+import asyncio
 import logging
 import numpy as np
 import os
@@ -412,8 +413,9 @@ async def sum_waveforms_endpoint(params: WaveformSummationInput):
         # Create output directory (use temp dir on server)
         output_dir = tempfile.mkdtemp(prefix="sweet_waveforms_")
         
-        # Sum waveforms
-        stats = sum_waveforms(
+        # Sum waveforms (run in thread pool to avoid blocking the event loop)
+        stats = await asyncio.to_thread(
+            sum_waveforms,
             subsources=subsources,
             stations=stations,
             templates_dir=templates_dir,
