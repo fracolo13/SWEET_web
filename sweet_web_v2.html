@@ -89,8 +89,8 @@
             </div>
             
             <div class="grid md:grid-cols-2 gap-8">
-                <!-- GeoJSON Mode Card -->
-                <div class="mode-card bg-white rounded-xl shadow-lg p-8" onclick="selectMode('geojson')">
+                <!-- GeoJSON Mode Card (hidden during development) -->
+                <div class="mode-card bg-white rounded-xl shadow-lg p-8 hidden" onclick="selectMode('geojson')">
                     <div class="text-center">
                         <div class="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                             <i class="fas fa-map text-4xl text-blue-600"></i>
@@ -4068,26 +4068,23 @@
                 downloadBtn.className = 'block mt-2 px-4 py-2 bg-purple-600 text-white text-center rounded hover:bg-purple-700 transition text-sm font-medium';
                 downloadBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Download Plot';
                 
-                imgContainer.appendChild(img);
                 plotCard.appendChild(title);
-                plotCard.appendChild(imgContainer);
 
                 if (key === 'shakemap') {
-                    const mapWrap = document.createElement('div');
-                    mapWrap.className = 'p-2 bg-gray-50 border-t border-gray-200';
-
-                    const mapTitle = document.createElement('div');
-                    mapTitle.className = 'text-sm font-semibold text-gray-700 mb-2';
-                    mapTitle.textContent = 'Station PGA Map';
+                    // Combined interactive map: OSM base + interpolated PGA heatmap + fault + stations
+                    const mapContainer = document.createElement('div');
+                    mapContainer.className = 'p-2 bg-gray-50';
 
                     const mapDiv = document.createElement('div');
                     mapDiv.id = 'shakemap-station-map';
                     mapDiv.className = 'border border-gray-300 rounded-lg';
-                    mapDiv.style.height = '320px';
+                    mapDiv.style.height = '450px';
 
-                    mapWrap.appendChild(mapTitle);
-                    mapWrap.appendChild(mapDiv);
-                    plotCard.appendChild(mapWrap);
+                    mapContainer.appendChild(mapDiv);
+                    plotCard.appendChild(mapContainer);
+                } else {
+                    imgContainer.appendChild(img);
+                    plotCard.appendChild(imgContainer);
                 }
 
                 plotCard.appendChild(downloadBtn);
@@ -4156,40 +4153,115 @@
             const centerLat = (Math.max(...lats) + Math.min(...lats)) / 2;
             const centerLon = (Math.max(...lons) + Math.min(...lons)) / 2;
 
-            const trace = {
+            const traces = [];
+
+            // 1. Interpolated PGA heatmap (density/kernel-smoothed over OSM tiles)
+            traces.push({
+                type: 'densitymapbox',
+                lat: lats,
+                lon: lons,
+                z: pgaVals,
+                radius: 50,
+                opacity: 0.6,
+                colorscale: 'YlOrRd',
+                showscale: true,
+                colorbar: {
+                    title: { text: 'PGA (m/s²)', side: 'right' },
+                    thickness: 12,
+                    len: 0.65,
+                    x: 1.02
+                },
+                name: 'PGA (interpolated)',
+                hoverinfo: 'skip'
+            });
+
+            // 2. Station markers colored by PGA
+            traces.push({
                 type: 'scattermapbox',
                 mode: 'markers',
                 lat: lats,
                 lon: lons,
-                text: rows.map(r => `${r.station}<br>PGA: ${r.pga.toFixed(4)} m/s²`),
+                text: rows.map(r => `<b>${r.station}</b><br>PGA: ${r.pga.toFixed(4)} m/s²`),
                 hoverinfo: 'text',
                 marker: {
-                    size: 11,
+                    size: 10,
                     color: pgaVals,
-                    colorscale: 'Hot',
-                    showscale: true,
-                    colorbar: {
-                        title: { text: 'PGA (m/s²)' }
-                    },
-                    line: {
-                        color: '#111827',
-                        width: 1
-                    }
+                    colorscale: 'YlOrRd',
+                    showscale: false,
+                    line: { color: '#111827', width: 1 }
                 },
                 name: 'Stations'
-            };
+            });
+
+            // 3. Fault surface projection (synthetic mode)
+            const mapboxLayers = [];
+            if (!window.isGeoJSONMode && typeof faultData !== 'undefined' && faultData) {
+                const hypoLat = parseFloat(document.getElementById('hypo-lat').value);
+                const hypoLon = parseFloat(document.getElementById('hypo-lon').value);
+                const strike = parseFloat(document.getElementById('strike').value);
+                const { length, width, dip } = faultData;
+                const strikeRad = strike * Math.PI / 180;
+                const dipRad = dip * Math.PI / 180;
+                const halfLength = length / 2;
+                const cosLat = Math.cos(hypoLat * Math.PI / 180);
+
+                const deltaLat = (halfLength * Math.cos(strikeRad)) / 111.0;
+                const deltaLon = (halfLength * Math.sin(strikeRad)) / (111.0 * cosLat);
+                const perpRad = strikeRad - Math.PI / 2;
+                const horizDip = width * Math.cos(dipRad);
+                const dipLat = (horizDip * Math.cos(perpRad)) / 111.0;
+                const dipLon = (horizDip * Math.sin(perpRad)) / (111.0 * cosLat);
+
+                const fc0lat = hypoLat - deltaLat, fc0lon = hypoLon - deltaLon;
+                const fc1lat = hypoLat + deltaLat, fc1lon = hypoLon + deltaLon;
+                const fc2lat = fc1lat + dipLat,    fc2lon = fc1lon + dipLon;
+                const fc3lat = fc0lat + dipLat,    fc3lon = fc0lon + dipLon;
+
+                traces.push({
+                    type: 'scattermapbox',
+                    mode: 'lines',
+                    lon: [fc0lon, fc1lon, fc2lon, fc3lon, fc0lon],
+                    lat: [fc0lat, fc1lat, fc2lat, fc3lat, fc0lat],
+                    line: { color: 'rgba(220,50,50,0.9)', width: 3 },
+                    name: 'Fault Projection',
+                    hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra>Fault</extra>',
+                    showlegend: true
+                });
+
+                mapboxLayers.push({
+                    sourcetype: 'geojson',
+                    source: {
+                        type: 'FeatureCollection',
+                        features: [{ type: 'Feature', geometry: {
+                            type: 'Polygon',
+                            coordinates: [[[fc0lon,fc0lat],[fc1lon,fc1lat],[fc2lon,fc2lat],[fc3lon,fc3lat],[fc0lon,fc0lat]]]
+                        }}]
+                    },
+                    type: 'fill',
+                    color: 'rgba(220,50,50,0.20)'
+                });
+            }
 
             const layout = {
                 mapbox: {
                     style: 'open-street-map',
                     center: { lat: centerLat, lon: centerLon },
-                    zoom: 6
+                    zoom: 6,
+                    layers: mapboxLayers
                 },
                 margin: { l: 0, r: 0, t: 0, b: 0 },
-                showlegend: false
+                showlegend: true,
+                legend: {
+                    x: 0.01, y: 0.99,
+                    xanchor: 'left', yanchor: 'top',
+                    bgcolor: 'rgba(255,255,255,0.85)',
+                    bordercolor: 'rgba(0,0,0,0.2)',
+                    borderwidth: 1,
+                    font: { size: 11 }
+                }
             };
 
-            Plotly.newPlot(mapDiv, [trace], layout, { responsive: true });
+            Plotly.newPlot(mapDiv, traces, layout, { responsive: true });
         }
         
         // Open plot in modal/new window

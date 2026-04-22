@@ -72,8 +72,13 @@ class S3TemplateLoader:
         if not self.bucket_name:
             raise ValueError("S3_BUCKET_NAME environment variable not set")
         
-        # Initialize S3 client
-        self.s3_client = boto3.client('s3')
+        # Initialize S3 client with an enlarged connection pool to prevent
+        # "Connection pool is full" warnings when many threads download in parallel.
+        from botocore.config import Config
+        self.s3_client = boto3.client(
+            's3',
+            config=Config(max_pool_connections=50)
+        )
         
         # Create cache directory
         self.cache_dir.mkdir(parents=True, exist_ok=True)
