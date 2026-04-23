@@ -7,719 +7,606 @@
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        .tab-button {
-            transition: all 0.3s ease;
-            border-bottom: 3px solid transparent;
-        }
-        .tab-button.active {
-            border-bottom-color: #667eea;
-            color: #667eea;
-            font-weight: 600;
-        }
-        .tab-button:hover {
-            background-color: #f3f4f6;
-        }
-        .mode-card {
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        .mode-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-        }
+        * { box-sizing: border-box; }
+        body { margin: 0; overflow: hidden; height: 100vh; }
+        .mode-card { transition: all 0.3s ease; cursor: pointer; }
+        .mode-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.25); }
+        .fault-tab-btn { transition: background 0.15s, color 0.15s; cursor: pointer; }
+        .fault-tab-btn.active { background: #334155 !important; color: white !important; }
+        .panel-scroll::-webkit-scrollbar { width: 4px; }
+        .panel-scroll::-webkit-scrollbar-track { background: transparent; }
+        .panel-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+        .leaflet-container { cursor: crosshair; }
+        input[type=range] { accent-color: #6366f1; }
     </style>
 </head>
-<body class="bg-gray-100 flex flex-col min-h-screen">
-    
-    <!-- HEADER -->
-    <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg">
-        <div class="container mx-auto px-6 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition" onclick="resetApplication()" title="Click to start a new scenario">
-                    <i class="fas fa-chart-area text-3xl"></i>
-                    <div>
-                        <h1 class="text-2xl font-bold">SWEET</h1>
-                        <p class="text-xs text-blue-100">Finite fault waveform simulation tool</p>
-                    </div>
-                </div>
-                <!-- Progress Steps -->
-                <div id="progress-steps" class="flex items-center space-x-2 hidden">
-                    <div class="flex items-center">
-                        <div id="step-1" class="flex items-center">
-                            <div class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-sm font-bold">1</div>
-                            <span class="ml-2 text-sm font-medium">Geometry</span>
-                        </div>
-                        <div class="mx-2 text-white/50">→</div>
-                        <div id="step-2" class="flex items-center">
-                            <div class="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold">2</div>
-                            <span class="ml-2 text-sm font-medium text-white/50">Kinematics</span>
-                        </div>
-                        <div class="mx-2 text-white/50">→</div>
-                        <div id="step-3" class="flex items-center">
-                            <div class="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold">3</div>
-                            <span class="ml-2 text-sm font-medium text-white/50">Subsources</span>
-                        </div>
-                        <div class="mx-2 text-white/50">→</div>
-                        <div id="step-4" class="flex items-center">
-                            <div class="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold">4</div>
-                            <span class="ml-2 text-sm font-medium text-white/50">Spatial Setup</span>
-                        </div>
-                        <div class="mx-2 text-white/50">→</div>
-                        <div id="step-5" class="flex items-center">
-                            <div class="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold">5</div>
-                            <span class="ml-2 text-sm font-medium text-white/50">Waveforms</span>
-                        </div>
-                    </div>
-                </div>
-                <!-- About Button -->
-                <button id="about-btn" onclick="showAbout()" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition flex items-center font-medium text-sm">
-                    <i class="fas fa-info-circle mr-2"></i>About
-                </button>
-            </div>
-        </div>
-    </header>
+<body>
 
-    <!-- LANDING PAGE -->
-    <div id="landing-page" class="container mx-auto px-6 py-12 flex-grow">
-        <div class="max-w-4xl mx-auto">
-            <div class="text-center mb-12">
-                <h2 class="text-4xl font-bold text-gray-800 mb-4">Welcome to SWEET</h2>
-                <p class="text-lg text-gray-600">Choose how you want to define your seismic fault</p>
-            </div>
-            
-            <div class="grid md:grid-cols-2 gap-8">
-                <!-- GeoJSON Mode Card (hidden during development) -->
-                <div class="mode-card bg-white rounded-xl shadow-lg p-8 hidden" onclick="selectMode('geojson')">
-                    <div class="text-center">
-                        <div class="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-map text-4xl text-blue-600"></i>
-                        </div>
-                        <h3 class="text-2xl font-bold text-gray-800 mb-3">Load from GeoJSON</h3>
-                        <p class="text-gray-600 mb-4">Import an existing fault geometry from a GeoJSON file</p>
-                        <ul class="text-sm text-gray-500 text-left space-y-2">
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Use real fault traces</li>
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Complex geometries</li>
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Multiple segments</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <!-- Synthetic Mode Card -->
-                <div class="mode-card bg-white rounded-xl shadow-lg p-8" onclick="selectMode('synthetic')">
-                    <div class="text-center">
-                        <div class="bg-purple-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-sliders-h text-4xl text-purple-600"></i>
-                        </div>
-                        <h3 class="text-2xl font-bold text-gray-800 mb-3">Generate Synthetic</h3>
-                        <p class="text-gray-600 mb-4">Create a simple rectangular fault with custom parameters</p>
-                        <ul class="text-sm text-gray-500 text-left space-y-2">
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Quick setup</li>
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Adjustable parameters</li>
-                            <li><i class="fas fa-check text-green-500 mr-2"></i>Real-time preview</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+  <!-- ═══ FIXED TOP BAR ═══ -->
+  <header id="app-header" class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-5"
+          style="height:48px; background:linear-gradient(90deg,#1e3a5f 0%,#2d1b69 100%); box-shadow:0 2px 12px rgba(0,0,0,0.4);">
+    <button onclick="resetApplication()" class="flex items-center gap-2 text-white hover:text-blue-200 transition" title="New scenario">
+      <i class="fas fa-chart-area text-xl"></i>
+      <span class="font-bold text-lg tracking-tight">SWEET</span>
+      <span class="text-xs text-blue-300 hidden sm:block ml-1">Finite fault waveform tool</span>
+    </button>
+    <div id="progress-steps" class="hidden flex items-center gap-1 text-xs font-medium">
+      <div id="step-1" class="flex items-center gap-1.5">
+        <div class="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-xs font-bold text-white">1</div>
+        <span class="text-white/60 hidden md:block">Rupture</span>
+      </div>
+      <span class="text-white/30 mx-0.5">›</span>
+      <div id="step-2" class="flex items-center gap-1.5">
+        <div class="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-xs font-bold text-white">2</div>
+        <span class="text-white/60 hidden md:block">Kinematics</span>
+      </div>
+      <span class="text-white/30 mx-0.5">›</span>
+      <div id="step-3" class="flex items-center gap-1.5">
+        <div class="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-xs font-bold text-white">3</div>
+        <span class="text-white/60 hidden md:block">Sources</span>
+      </div>
+      <span class="text-white/30 mx-0.5">›</span>
+      <div id="step-4" class="flex items-center gap-1.5">
+        <div class="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-xs font-bold text-white">4</div>
+        <span class="text-white/60 hidden md:block">Stations</span>
+      </div>
+      <span class="text-white/30 mx-0.5">›</span>
+      <div id="step-5" class="flex items-center gap-1.5">
+        <div class="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-xs font-bold text-white">5</div>
+        <span class="text-white/60 hidden md:block">Waveforms</span>
+      </div>
+    </div>
+    <button id="about-btn" onclick="showAbout()" class="flex items-center gap-1.5 text-xs text-white/80 hover:text-white transition bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full">
+      <i class="fas fa-info-circle"></i><span>About</span>
+    </button>
+  </header>
+
+  <!-- ═══ FULL-SCREEN LEAFLET MAP ═══ -->
+  <div id="leaflet-map" style="position:fixed; top:48px; left:0; right:0; bottom:0; z-index:0;"></div>
+
+  <!-- ═══ LANDING MODAL ═══ -->
+  <div id="landing-page" style="position:fixed; top:48px; left:0; right:0; bottom:0; z-index:800; background:rgba(10,15,30,0.85); display:flex; align-items:center; justify-content:center;">
+    <div class="text-center px-6" style="max-width:540px;">
+      <div class="mb-8">
+        <div class="text-5xl mb-4">🌍</div>
+        <h2 class="text-4xl font-bold text-white mb-2">SWEET</h2>
+        <p class="text-blue-300 text-base">Finite Fault Waveform Simulation</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="mode-card rounded-2xl p-6 cursor-pointer border border-blue-500/40 bg-white/10 hover:bg-white/20 transition hidden" onclick="selectMode('geojson')">
+          <i class="fas fa-map text-2xl text-blue-400 mb-3 block"></i>
+          <h3 class="text-white font-bold text-base mb-1">Load GeoJSON</h3>
+          <p class="text-blue-200 text-xs">Import existing fault geometry</p>
         </div>
+        <div class="mode-card rounded-2xl p-6 cursor-pointer border border-purple-500/60 bg-purple-500/20 hover:bg-purple-500/35 transition" onclick="selectMode('synthetic')">
+          <i class="fas fa-sliders-h text-2xl text-purple-300 mb-3 block"></i>
+          <h3 class="text-white font-bold text-base mb-1">Synthetic Fault</h3>
+          <p class="text-purple-200 text-xs">Create a rectangular fault with custom parameters</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP CLICK HINT -->
+  <div id="map-click-hint" class="hidden" style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:600; background:rgba(15,23,42,0.9); color:white; padding:8px 18px; border-radius:50px; font-size:12px; pointer-events:none; border:1px solid rgba(99,102,241,0.5); white-space:nowrap;">
+    <i class="fas fa-hand-pointer mr-2 text-indigo-400"></i>Click on map to set epicenter
+  </div>
+
+  <!-- ═══ RIGHT PANEL — Step 1: Fault Setup ═══ -->
+  <div id="fault-panel" class="hidden" style="position:fixed; top:48px; right:0; width:340px; height:calc(100vh - 48px); z-index:500; background:white; box-shadow:-4px 0 24px rgba(0,0,0,0.18); display:flex; flex-direction:column; overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#1e3a5f,#2d1b69); padding:14px 18px; flex-shrink:0;">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-2 text-white">
+          <i class="fas fa-sliders-h text-base text-purple-300"></i>
+          <span class="font-bold text-sm">Rupture Setup</span>
+        </div>
+        <button onclick="goHome()" class="text-white/50 hover:text-white transition text-xs flex items-center gap-1"><i class="fas fa-home"></i></button>
+      </div>
+      <p class="text-xs text-blue-200 mt-0.5">Set location, geometry and kinematics</p>
     </div>
 
-    <!-- About Modal -->
-    <div id="about-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-2xl">
-                <div class="flex justify-between items-center">
-                    <h2 class="text-2xl font-bold flex items-center">
-                        <i class="fas fa-info-circle mr-3"></i>
-                        About SWEET
-                    </h2>
-                    <button onclick="closeAbout()" class="text-white hover:text-gray-200 transition text-2xl">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="p-8 space-y-6">
-                <div>
-                    <h3 class="text-xl font-bold text-gray-800 mb-3">Synthetic Waveform Emulator for Earthquake Testing</h3>
-                    <p class="text-gray-700 leading-relaxed">
-                        SWEET is an interactive web application for finite fault modeling and synthetic seismic waveform generation. 
-                        The tool allows users to design custom earthquake rupture scenarios through an intuitive multi-step workflow, 
-                        from fault geometry definition to kinematic parameter specification, subsource grouping, and spatial station setup.
-                    </p>
-                </div>
-                
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Key Features</h3>
-                    <ul class="list-disc list-inside space-y-2 text-gray-700">
-                        <li>Interactive fault geometry design with plane or listric modes</li>
-                        <li>Customizable kinematic parameters (slip, rake, rise time, rupture velocity)</li>
-                        <li>Moment-based subsource grouping for waveform synthesis</li>
-                        <li>Real-time visualization of fault model, slip distribution, and source time functions</li>
-                        <li>Spatial station configuration for waveform computation</li>
-                    </ul>
-                </div>
-                
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Workflow</h3>
-                    <div class="flex flex-wrap gap-2">
-                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">1. Geometry</span>
-                        <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">2. Kinematics</span>
-                        <span class="px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm font-medium">3. Subsources</span>
-                        <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">4. Spatial Setup</span>
-                    </div>
-                </div>
-                
-                <div class="border-t pt-6 mt-6">
-                    <p class="text-gray-600 text-sm">
-                        <strong>Author:</strong> Francesco Acolosimo<br>
-                        <strong>Year:</strong> 2025<br>
-                        <strong>Version:</strong> 1.0
-                    </p>
-                </div>
-            </div>
-        </div>
+    <div id="geojson-inputs" class="hidden px-4 py-4 border-b">
+      <h4 class="font-semibold text-gray-700 mb-3 text-xs uppercase tracking-wider flex items-center gap-2"><i class="fas fa-upload text-blue-500"></i>Load GeoJSON</h4>
+      <input type="file" id="geojson-file" accept=".geojson,.json" class="w-full px-3 py-2 border border-gray-300 rounded text-xs mb-3">
+      <button onclick="loadGeoJSON()" class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition text-xs"><i class="fas fa-map mr-1"></i>Load File</button>
     </div>
 
-    <!-- MAIN WORKSPACE (Hidden initially) -->
-    <div id="workspace" class="hidden flex-grow">
-        <div class="container-fluid mx-auto px-6 py-6">
-            <div class="flex flex-col md:flex-row gap-6" style="height: calc(100vh - 240px);">
-                
-                <!-- LEFT PANEL (30%) - INPUTS -->
-                <div class="w-full md:w-1/3 border-r border-gray-200 overflow-hidden relative" style="max-height: calc(100vh - 240px);">
-                    
-                    <!-- Geometry Panel -->
-                    <div id="geometry-panel" class="transition-transform duration-500 ease-in-out overflow-y-auto" style="transform: translateX(0); height: 100%;">
-                        <div class="p-6">
-                    
-                        <!-- GeoJSON Mode -->
-                        <div id="geojson-inputs" class="hidden">
-                            <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                                <i class="fas fa-map mr-3 text-blue-600"></i>
-                                Load GeoJSON
-                            </h3>
-                            
-                            <div class="mb-6">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Select GeoJSON File</label>
-                                <input type="file" id="geojson-file" accept=".geojson,.json" class="w-full px-3 py-2 border border-gray-300 rounded">
-                            </div>
-                            
-                            <button onclick="loadGeoJSON()" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition shadow-lg">
-                                <i class="fas fa-upload mr-2"></i>Load File
-                            </button>
-                        </div>
-                        
-                        <!-- Synthetic Mode -->
-                        <div id="synthetic-inputs" class="hidden">
-                            <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                                <i class="fas fa-cogs mr-3 text-purple-600"></i>
-                                Fault Parameters
-                            </h3>
-                            
-                            <!-- Geometry Section -->
-                            <div class="mb-6">
-                                <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                                    <i class="fas fa-ruler-combined mr-2 text-blue-500"></i>
-                                    Geometry
-                                </h4>
-                                
-                                <!-- Length -->
-                                <div class="mb-5 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-                                    <label class="block text-sm font-semibold text-gray-800 mb-3">Length (km)</label>
-                                    <div class="flex items-center space-x-3">
-                                        <input type="range" id="length" min="10" max="1000" value="100" oninput="updateValue('length')" class="flex-1">
-                                        <input type="number" id="length-val" min="10" max="1000" value="100" class="w-24 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-medium focus:border-blue-500 focus:outline-none" oninput="syncSlider('length')">
-                                    </div>
-                                </div>
-                                
-                                <!-- Width -->
-                                <div class="mb-5 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-                                    <label class="block text-sm font-semibold text-gray-800 mb-3">Width (km)</label>
-                                    <div class="flex items-center space-x-3">
-                                        <input type="range" id="width" min="5" max="200" value="30" oninput="updateValue('width')" class="flex-1">
-                                        <input type="number" id="width-val" min="5" max="200" value="30" class="w-24 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-medium focus:border-blue-500 focus:outline-none" oninput="syncSlider('width')">
-                                    </div>
-                                </div>
-                                
-                                <!-- Dip -->
-                                <div class="mb-5 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-                                    <label class="block text-sm font-semibold text-gray-800 mb-3">Dip (°)</label>
-                                    <div class="flex items-center space-x-3">
-                                        <input type="range" id="dip" min="0" max="90" value="45" oninput="updateValue('dip')" class="flex-1">
-                                        <input type="number" id="dip-val" min="0" max="90" value="45" class="w-20 px-2 py-1 border border-gray-300 rounded text-center" oninput="syncSlider('dip')">
-                                    </div>
-                                </div>
-                                
-                                <!-- Top Depth -->
-                                <div class="mb-5 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-                                    <label class="block text-sm font-semibold text-gray-800 mb-3">Top Depth (km)</label>
-                                    <div class="flex items-center space-x-3">
-                                        <input type="range" id="top-depth" min="0" max="50" value="5" oninput="updateValue('top-depth')" class="flex-1">
-                                        <input type="number" id="top-depth-val" min="0" max="50" value="5" class="w-24 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-medium focus:border-blue-500 focus:outline-none" oninput="syncSlider('top-depth')">
-                                    </div>
-                                </div>
-                                
-                                <!-- Patch Size -->
-                                <div class="mb-5 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-                                    <label class="block text-sm font-semibold text-gray-800 mb-3">Patch Size (km)</label>
-                                    <div class="flex items-center space-x-3">
-                                        <input type="range" id="patch-size" min="1" max="20" value="5" oninput="updateValue('patch-size')" class="flex-1">
-                                        <input type="number" id="patch-size-val" min="1" max="20" value="5" class="w-24 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-medium focus:border-blue-500 focus:outline-none" oninput="syncSlider('patch-size')">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        </div>
-                    </div>
-                    
-                    <!-- Kinematics Panel -->
-                    <div id="kinematics-panel" class="transition-transform duration-500 ease-in-out absolute top-0 left-0 w-full overflow-y-auto" style="transform: translateX(100%); height: 100%;">
-                        <div class="p-6">
-                        
-                        <div class="mb-6">
-                            <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center">
-                                <i class="fas fa-bolt mr-3 text-purple-600"></i>
-                                Fault Kinematics
-                            </h3>
-                            <p class="text-sm text-gray-600">Define rupture characteristics and slip distribution</p>
-                        </div>
-                        
-                        <!-- Rupture Parameters Section -->
-                        <div id="rupture-params" class="mb-6">
-                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                                <i class="fas fa-bolt mr-2 text-green-500"></i>
-                                Rupture Parameters
-                            </h4>
-                            
-                            <!-- Rake -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Rake (°)</label>
-                                <div class="flex items-center space-x-3">
-                                    <input type="range" id="rake" min="-180" max="180" value="90" oninput="updateValue('rake'); updateRakeMechanism()" class="flex-1">
-                                    <input type="number" id="rake-val" min="-180" max="180" value="90" class="w-20 px-2 py-1 border border-gray-300 rounded text-center" oninput="syncSlider('rake'); updateRakeMechanism()">
-                                </div>
-                                <div id="rake-mechanism" class="text-xs text-blue-600 mt-1 font-medium">Reverse/Thrust fault</div>
-                            </div>
-                            
-                            <!-- Event Magnitude -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2" id="magnitude-label">Event Magnitude (Mw)</label>
-                                <div class="flex items-center space-x-3">
-                                    <input type="range" id="magnitude" min="5.0" max="9.0" step="0.1" value="7.0" oninput="updateValue('magnitude')" class="flex-1">
-                                    <input type="number" id="magnitude-val" min="5.0" max="9.0" step="0.1" value="7.0" class="w-20 px-2 py-1 border border-gray-300 rounded text-center" oninput="syncSlider('magnitude')">
-                                </div>
-                                <p id="magnitude-info" class="text-xs text-blue-600 mt-1 hidden"></p>
-                            </div>
-                            
-                            <!-- Slip Distribution -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Slip Distribution</label>
-                                <select id="slip-dist" class="w-full px-3 py-2 border border-gray-300 rounded">
-                                    <option value="uniform">Uniform</option>
-                                    <option value="random">Random</option>
-                                    <option value="gaussian" selected>Gaussian</option>
-                                    <option value="asperity">Asperity</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Hypocenter Location -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Hypocenter Along-Strike: <span id="hypo-along-value" class="text-blue-600 font-semibold">0.5</span>
-                                </label>
-                                <input type="range" id="hypo-along" min="0" max="1" step="0.01" value="0.5" class="w-full" oninput="document.getElementById('hypo-along-value').textContent = parseFloat(this.value).toFixed(2)">
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Hypocenter Down-Dip: <span id="hypo-down-value" class="text-blue-600 font-semibold">0.5</span>
-                                </label>
-                                <input type="range" id="hypo-down" min="0" max="1" step="0.01" value="0.5" class="w-full" oninput="document.getElementById('hypo-down-value').textContent = parseFloat(this.value).toFixed(2)">
-                            </div>
-                            
-                            <!-- Rupture Velocity -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Rupture Velocity: <span id="rupture-vel-value" class="text-blue-600 font-semibold">3.0</span> km/s
-                                </label>
-                                <input type="range" id="rupture-vel" min="1.5" max="4.5" step="0.1" value="3.0" class="w-full" oninput="document.getElementById('rupture-vel-value').textContent = parseFloat(this.value).toFixed(1)">
-                            </div>
-                        </div>
-                        
-                        </div>
-                    </div>
-                    
-                    <!-- Subsources Panel -->
-                    <div id="subsources-panel" class="transition-transform duration-500 ease-in-out absolute top-0 left-0 w-full overflow-y-auto" style="transform: translateX(100%); height: 100%;">
-                        <div class="p-6">
-                        
-                        <div class="mb-6">
-                            <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center">
-                                <i class="fas fa-layer-group mr-3 text-indigo-600"></i>
-                                Subsources Selection
-                            </h3>
-                            <p class="text-sm text-gray-600">Select fault patches to use as subsources for waveform computation</p>
-                        </div>
-                        
-                        <!-- Subsources Configuration Section -->
-                        <div class="mb-6">
-                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                                <i class="fas fa-cogs mr-2 text-purple-500"></i>
-                                Subsource Grouping
-                            </h4>
-                            
-                            <!-- Subsource Magnitude Slider -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Target Subsource Magnitude: <span id="subsource-mag-value" class="text-blue-600 font-semibold">6.0</span>
-                                </label>
-                                <input type="range" id="subsource-magnitude" min="5.0" max="6.5" step="0.1" value="6.0" class="w-full" oninput="updateSubsourceGrouping()">
-                                <p class="text-xs text-gray-500 mt-1">Patches will be grouped to reach this target magnitude</p>
-                            </div>
-                        </div>
-                        
-                        <!-- Subsources Summary -->
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                            <h5 class="font-semibold text-blue-800 mb-2 text-sm">Subsource Groups</h5>
-                            <div class="text-sm text-gray-700 space-y-1">
-                                <p><span class="font-medium">Total Patches:</span> <span id="total-patches">-</span></p>
-                                <p><span class="font-medium">Number of Subsources:</span> <span id="selected-patches" class="text-lg font-bold text-blue-600">-</span></p>
-                                <p><span class="font-medium">Avg Patches per Subsource:</span> <span id="subsource-coverage">-</span></p>
-                            </div>
-                        </div>
-                        
-                        <!-- Magnitude Distribution Histogram -->
-                        <div class="bg-white border border-gray-300 rounded-lg p-4 mb-4">
-                            <h5 class="font-semibold text-gray-800 mb-3 text-sm">Subsource Magnitude Distribution</h5>
-                            <div id="magnitude-histogram" style="height: 300px;"></div>
-                        </div>
-                        
-                        </div>
-                    </div>
-                    
-                    <!-- Spatial Setup Panel -->
-                    <div id="spatial-panel" class="transition-transform duration-500 ease-in-out absolute top-0 left-0 w-full overflow-y-auto" style="transform: translateX(100%); height: 100%;">
-                        <div class="p-6">
-                        
-                        <div class="mb-6">
-                            <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center">
-                                <i class="fas fa-map-marker-alt mr-3 text-orange-600"></i>
-                                Spatial Setup
-                            </h3>
-                            <p class="text-sm text-gray-600">Define fault location and station network</p>
-                        </div>
-                        
-                        <!-- Fault Location Section -->
-                        <div class="mb-6">
-                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                                <i class="fas fa-compass mr-2 text-blue-500"></i>
-                                Fault Location
-                            </h4>
-                            
-                            <!-- Hypocenter Latitude -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Hypocenter Latitude (°)</label>
-                                <input type="number" id="hypo-lat" value="35.0" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded" oninput="visualizeMap()">
-                            </div>
-                            
-                            <!-- Hypocenter Longitude -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Hypocenter Longitude (°)</label>
-                                <input type="number" id="hypo-lon" value="-118.0" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded" oninput="visualizeMap()">
-                            </div>
-                            
-                            <!-- Strike -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Strike: <span id="strike-value" class="text-blue-600 font-semibold">0</span>° (N→E)
-                                </label>
-                                <input type="range" id="strike" min="0" max="360" step="5" value="0" class="w-full" oninput="document.getElementById('strike-value').textContent = this.value; visualizeMap()">
-                            </div>
-                        </div>
-                        
-                        <!-- Station Network Section -->
-                        <div class="mb-6">
-                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                                <i class="fas fa-broadcast-tower mr-2 text-green-500"></i>
-                                Station Network
-                            </h4>
-                            
-                            <!-- Number of Stations -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Number of Stations: <span id="num-stations-value" class="text-blue-600 font-semibold">5</span>
-                                </label>
-                                <input type="range" id="num-stations" min="5" max="200" step="5" value="5" class="w-full" oninput="document.getElementById('num-stations-value').textContent = this.value">
-                            </div>
-                            
-                            <!-- Max Distance -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Max Distance: <span id="max-distance-value" class="text-blue-600 font-semibold">200</span> km
-                                </label>
-                                <input type="range" id="max-distance" min="50" max="200" step="10" value="200" class="w-full" oninput="document.getElementById('max-distance-value').textContent = this.value">
-                            </div>
+    <div id="synthetic-inputs" class="hidden flex-1 overflow-y-auto panel-scroll" style="padding-bottom:76px;">
 
-                            <div class="mb-4">
-                                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                    <input type="checkbox" id="avoid-water" class="rounded border-gray-300" checked>
-                                    <span>Avoid stations over water (land-only)</span>
-                                </label>
-                                <p class="text-xs text-gray-500 mt-1">Uses an on-server land mask. If too few land points are available, reduce constraints or increase max distance.</p>
-                            </div>
-                            
-                            <!-- Station Network Buttons -->
-                            <div class="flex gap-3 mb-4">
-                                <button onclick="generateRandomStations()" class="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition shadow">
-                                    <i class="fas fa-random mr-2"></i>Generate Random
-                                </button>
-                                <button onclick="loadStationFile()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition shadow">
-                                    <i class="fas fa-upload mr-2"></i>Load CSV
-                                </button>
-                            </div>
-                            
-                            <!-- Station List Display -->
-                            <div id="station-list" class="bg-gray-50 border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto hidden">
-                                <h5 class="text-xs font-semibold text-gray-700 mb-2">Stations (<span id="station-count">0</span>)</h5>
-                                <div id="station-items" class="text-xs text-gray-600 space-y-1"></div>
-                            </div>
-                        </div>
-                        
-                        <!-- Waveform Computation Section -->
-                        <div id="waveform-config" class="mb-6 hidden">
-                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                                <i class="fas fa-wave-square mr-2 text-purple-500"></i>
-                                Waveform Configuration
-                            </h4>
-                            
-                            <div class="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                                <strong>⚠️ First Run:</strong> Start with 5-10 stations to build the template cache (~30s). Once cached, you can use 100+ stations.
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Templates Directory</label>
-                                <input type="text" id="templates-dir" value="SWEET_scripts/DATA/processed_templates" class="w-full px-3 py-2 border border-gray-300 rounded text-xs">
-                                <p class="text-xs text-gray-500 mt-1">Relative to workspace root, or absolute path</p>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Number of Realizations: <span id="n-realizations-value" class="text-blue-600 font-semibold">1</span>
-                                </label>
-                                <input type="range" id="n-realizations" min="1" max="10" step="1" value="1" class="w-full" oninput="document.getElementById('n-realizations-value').textContent = this.value">
-                            </div>
-                            
-                            <button onclick="computeWaveforms()" class="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition shadow-lg">
-                                <i class="fas fa-calculator mr-2"></i>Compute Waveforms
-                            </button>
-            
-            <!-- Progress Bar -->
-            <div id="waveform-progress" class="mt-6 hidden">
-                <div class="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-5">
-                    <!-- Header with step info -->
-                    <div class="flex justify-between items-center mb-3">
-                        <div class="flex items-center">
-                            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600 mr-3"></div>
-                            <span id="progress-step-text" class="font-semibold text-gray-800">Computing waveforms...</span>
-                        </div>
-                        <span id="progress-percentage" class="text-sm font-bold text-purple-700">0%</span>
-                    </div>
-                    
-                    <!-- Progress bar -->
-                    <div class="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden">
-                        <div id="progress-bar-fill" class="bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
-                    </div>
-                    
-                    <!-- Time estimates -->
-                    <div class="flex justify-between text-xs text-gray-600">
-                        <span>⏱️ Elapsed: <span id="progress-elapsed" class="font-medium">0s</span></span>
-                        <span>⏳ Estimated remaining: <span id="progress-remaining" class="font-medium">calculating...</span></span>
-                    </div>
-                    
-                    <!-- Detail message -->
-                    <div id="progress-detail" class="mt-3 text-sm text-gray-600 italic"></div>
-                    
-                    <!-- Cancel button -->
-                    <button id="cancel-waveform-btn" onclick="cancelWaveformComputation()" class="mt-3 w-full bg-red-500 text-white py-2 rounded-lg font-semibold hover:bg-red-600 transition shadow hidden">
-                        <i class="fas fa-times-circle mr-2"></i>Cancel Computation
-                    </button>
-                </div>
+      <!-- Location -->
+      <div class="px-4 pt-4 pb-3 border-b border-gray-100">
+        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-2">
+          <i class="fas fa-map-marker-alt text-red-500"></i>Location
+          <span class="text-indigo-400 font-normal normal-case ml-auto text-xs">← click map</span>
+        </h4>
+        <div class="grid grid-cols-2 gap-2 mb-2.5">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Latitude (°)</label>
+            <input type="number" id="hypo-lat" value="45.0" step="0.001" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-indigo-400 focus:outline-none" oninput="updateMapProjection()">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Longitude (°)</label>
+            <input type="number" id="hypo-lon" value="15.0" step="0.001" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-indigo-400 focus:outline-none" oninput="updateMapProjection()">
+          </div>
+        </div>
+        <label class="text-xs text-gray-500 block mb-1">Strike: <span id="strike-value" class="text-indigo-600 font-semibold font-mono">0</span>°</label>
+        <input type="range" id="strike" min="0" max="360" step="5" value="0" class="w-full" oninput="document.getElementById('strike-value').textContent=this.value; updateMapProjection()">
+      </div>
+
+      <!-- Geometry -->
+      <div class="px-4 py-3 border-b border-gray-100">
+        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5"><i class="fas fa-ruler-combined text-blue-500"></i>Fault Geometry</h4>
+        <div class="space-y-2.5">
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-600 w-24 flex-shrink-0">Length (km)</label>
+            <input type="range" id="length" min="10" max="1000" value="100" oninput="updateValue('length'); updateMapProjection()" class="flex-1">
+            <input type="number" id="length-val" min="10" max="1000" value="100" class="w-14 px-1.5 py-1 border border-gray-200 rounded text-xs text-center font-mono" oninput="syncSlider('length'); updateMapProjection()">
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-600 w-24 flex-shrink-0">Width (km)</label>
+            <input type="range" id="width" min="5" max="200" value="30" oninput="updateValue('width'); updateMapProjection()" class="flex-1">
+            <input type="number" id="width-val" min="5" max="200" value="30" class="w-14 px-1.5 py-1 border border-gray-200 rounded text-xs text-center font-mono" oninput="syncSlider('width'); updateMapProjection()">
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-600 w-24 flex-shrink-0">Dip (°)</label>
+            <input type="range" id="dip" min="0" max="90" value="45" oninput="updateValue('dip'); updateMapProjection()" class="flex-1">
+            <input type="number" id="dip-val" min="0" max="90" value="45" class="w-14 px-1.5 py-1 border border-gray-200 rounded text-xs text-center font-mono" oninput="syncSlider('dip'); updateMapProjection()">
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-600 w-24 flex-shrink-0">Top depth (km)</label>
+            <input type="range" id="top-depth" min="0" max="50" value="5" oninput="updateValue('top-depth')" class="flex-1">
+            <input type="number" id="top-depth-val" min="0" max="50" value="5" class="w-14 px-1.5 py-1 border border-gray-200 rounded text-xs text-center font-mono" oninput="syncSlider('top-depth')">
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-600 w-24 flex-shrink-0">Patch size (km)</label>
+            <input type="range" id="patch-size" min="1" max="20" value="5" oninput="updateValue('patch-size')" class="flex-1">
+            <input type="number" id="patch-size-val" min="1" max="20" value="5" class="w-14 px-1.5 py-1 border border-gray-200 rounded text-xs text-center font-mono" oninput="syncSlider('patch-size')">
+          </div>
+        </div>
+      </div>
+
+      <!-- Kinematics -->
+      <div class="px-4 py-3">
+        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5"><i class="fas fa-bolt text-yellow-500"></i>Kinematics</h4>
+        <div class="space-y-2.5">
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label class="text-xs text-gray-600">Rake (°)</label>
+              <input type="number" id="rake-val" min="-180" max="180" value="90" class="w-14 px-1.5 py-1 border border-gray-200 rounded text-xs text-center font-mono" oninput="syncSlider('rake'); updateRakeMechanism()">
             </div>
-            
-            <!-- Status Message -->
-            <div id="waveform-status" class="mt-4 hidden"></div>
-            
-            <!-- View Results Button -->
-            <button id="view-waveforms-btn" onclick="viewWaveformResults()" class="w-full mt-4 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition shadow-lg hidden">
-                <i class="fas fa-eye mr-2"></i>View Results
+            <input type="range" id="rake" min="-180" max="180" value="90" oninput="updateValue('rake'); updateRakeMechanism()" class="w-full">
+            <div id="rake-mechanism" class="text-xs text-indigo-500 mt-0.5 font-medium">Reverse/Thrust fault</div>
+          </div>
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label class="text-xs text-gray-600" id="magnitude-label">Magnitude (Mw)</label>
+              <input type="number" id="magnitude-val" min="5.0" max="9.0" step="0.1" value="7.0" class="w-14 px-1.5 py-1 border border-gray-200 rounded text-xs text-center font-mono" oninput="syncSlider('magnitude')">
+            </div>
+            <input type="range" id="magnitude" min="5.0" max="9.0" step="0.1" value="7.0" oninput="updateValue('magnitude')" class="w-full">
+            <p id="magnitude-info" class="text-xs text-blue-500 mt-0.5 hidden"></p>
+          </div>
+          <div>
+            <label class="text-xs text-gray-600 block mb-1">Slip Distribution</label>
+            <select id="slip-dist" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:ring-1 focus:ring-indigo-400 focus:outline-none">
+              <option value="uniform">Uniform</option>
+              <option value="random">Random</option>
+              <option value="gaussian" selected>Gaussian</option>
+              <option value="asperity">Asperity</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-gray-600 block mb-1">Along-strike hypo: <span id="hypo-along-value" class="text-indigo-600 font-mono font-semibold">0.50</span></label>
+            <input type="range" id="hypo-along" min="0" max="1" step="0.01" value="0.5" class="w-full" oninput="document.getElementById('hypo-along-value').textContent=parseFloat(this.value).toFixed(2)">
+          </div>
+          <div>
+            <label class="text-xs text-gray-600 block mb-1">Down-dip hypo: <span id="hypo-down-value" class="text-indigo-600 font-mono font-semibold">0.50</span></label>
+            <input type="range" id="hypo-down" min="0" max="1" step="0.01" value="0.5" class="w-full" oninput="document.getElementById('hypo-down-value').textContent=parseFloat(this.value).toFixed(2)">
+          </div>
+          <div>
+            <label class="text-xs text-gray-600 block mb-1">Rupture velocity: <span id="rupture-vel-value" class="text-indigo-600 font-mono font-semibold">3.0</span> km/s</label>
+            <input type="range" id="rupture-vel" min="1.5" max="4.5" step="0.1" value="3.0" class="w-full" oninput="document.getElementById('rupture-vel-value').textContent=parseFloat(this.value).toFixed(1)">
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- Sticky compute button -->
+    <div id="fault-panel-footer" class="hidden" style="position:absolute; bottom:0; left:0; right:0; padding:12px 16px; background:white; border-top:1px solid #e5e7eb; box-shadow:0 -4px 12px rgba(0,0,0,0.08);">
+      <button onclick="runKinematics()" class="w-full py-2.5 rounded-xl font-bold text-white text-sm transition shadow-lg" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
+        <i class="fas fa-bolt mr-2"></i>Compute Kinematics
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ RIGHT PANEL — Step 4: Spatial / Stations ═══ -->
+  <div id="spatial-setup-panel" class="hidden" style="position:fixed; top:48px; right:0; width:340px; height:calc(100vh - 48px); z-index:500; background:white; box-shadow:-4px 0 24px rgba(0,0,0,0.18); display:flex; flex-direction:column; overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#064e3b,#065f46); padding:14px 18px; flex-shrink:0;">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-2 text-white">
+          <i class="fas fa-broadcast-tower text-base text-green-300"></i>
+          <span class="font-bold text-sm">Station Network</span>
+        </div>
+        <button onclick="backToFaultPlane()" class="text-white/50 hover:text-white transition text-xs flex items-center gap-1"><i class="fas fa-arrow-left"></i><span>Back</span></button>
+      </div>
+      <p class="text-xs text-green-200 mt-0.5">Configure stations and compute waveforms</p>
+    </div>
+
+    <div class="flex-1 overflow-y-auto panel-scroll" style="padding-bottom:76px;">
+
+      <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs text-gray-500">
+        <div class="grid grid-cols-3 gap-1">
+          <div><span class="block text-gray-400">Lat</span><span id="spatial-hypo-lat-display" class="font-mono font-semibold text-gray-700">45.000°</span></div>
+          <div><span class="block text-gray-400">Lon</span><span id="spatial-hypo-lon-display" class="font-mono font-semibold text-gray-700">15.000°</span></div>
+          <div><span class="block text-gray-400">Strike</span><span id="spatial-strike-display" class="font-mono font-semibold text-gray-700">0°</span></div>
+        </div>
+      </div>
+
+      <div class="px-4 py-3 border-b border-gray-100">
+        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">Generate Stations</h4>
+        <div class="space-y-2.5">
+          <div>
+            <label class="text-xs text-gray-600 block mb-1">Count: <span id="num-stations-value" class="text-indigo-600 font-semibold">5</span></label>
+            <input type="range" id="num-stations" min="5" max="200" step="5" value="5" class="w-full" oninput="document.getElementById('num-stations-value').textContent=this.value">
+          </div>
+          <div>
+            <label class="text-xs text-gray-600 block mb-1">Max distance: <span id="max-distance-value" class="text-indigo-600 font-semibold">200</span> km</label>
+            <input type="range" id="max-distance" min="50" max="200" step="10" value="200" class="w-full" oninput="document.getElementById('max-distance-value').textContent=this.value">
+          </div>
+          <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+            <input type="checkbox" id="avoid-water" checked class="rounded border-gray-300">
+            Land-only stations
+          </label>
+          <div class="flex gap-2">
+            <button onclick="generateRandomStations()" class="flex-1 bg-green-600 text-white py-1.5 rounded-lg text-xs font-semibold hover:bg-green-700 transition"><i class="fas fa-random mr-1"></i>Generate</button>
+            <button onclick="loadStationFile()" class="flex-1 bg-blue-600 text-white py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-700 transition"><i class="fas fa-upload mr-1"></i>Load CSV</button>
+          </div>
+          <div id="station-list" class="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-32 overflow-y-auto hidden">
+            <p class="text-xs font-semibold text-gray-500 mb-1">Stations (<span id="station-count">0</span>)</p>
+            <div id="station-items" class="text-xs text-gray-600 space-y-0.5"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="waveform-config" class="px-4 py-3 hidden">
+        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">Computation</h4>
+        <div class="mb-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+          <strong>⚠️ First Run:</strong> Start with 5–10 stations to warm up the template cache.
+        </div>
+        <div class="mb-2.5">
+          <label class="text-xs text-gray-600 block mb-1">Templates dir</label>
+          <input type="text" id="templates-dir" value="SWEET_scripts/DATA/processed_templates" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-indigo-400 focus:outline-none">
+        </div>
+        <div class="mb-2.5">
+          <label class="text-xs text-gray-600 block mb-1">Realizations: <span id="n-realizations-value" class="text-indigo-600 font-semibold">1</span></label>
+          <input type="range" id="n-realizations" min="1" max="10" step="1" value="1" class="w-full" oninput="document.getElementById('n-realizations-value').textContent=this.value">
+        </div>
+        <div id="waveform-progress" class="hidden mb-2.5">
+          <div class="bg-purple-50 border border-purple-200 rounded-lg p-3">
+            <div class="flex justify-between items-center mb-1.5">
+              <div class="flex items-center gap-2">
+                <div class="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-purple-600"></div>
+                <span id="progress-step-text" class="text-xs font-semibold text-gray-800">Computing...</span>
+              </div>
+              <span id="progress-percentage" class="text-xs font-bold text-purple-700">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden mb-1.5">
+              <div id="progress-bar-fill" class="bg-gradient-to-r from-purple-500 to-blue-500 h-1.5 rounded-full transition-all duration-500" style="width:0%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-gray-400">
+              <span>Elapsed: <span id="progress-elapsed" class="font-medium">0s</span></span>
+              <span>ETA: <span id="progress-remaining" class="font-medium">…</span></span>
+            </div>
+            <div id="progress-detail" class="mt-1 text-xs text-gray-400 italic"></div>
+            <button id="cancel-waveform-btn" onclick="cancelWaveformComputation()" class="hidden mt-2 w-full bg-red-500 text-white py-1 rounded text-xs font-semibold hover:bg-red-600 transition">
+              <i class="fas fa-times-circle mr-1"></i>Cancel
             </button>
-                    </div>
-                    
-                    <!-- Waveform Results Panel -->
-                    <div id="waveforms-panel" class="transition-transform duration-500 ease-in-out absolute top-0 left-0 w-full overflow-y-auto" style="transform: translateX(100%); height: 100%;">
-                        <div class="p-6">
-                        
-                        <div class="mb-6">
-                            <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center">
-                                <i class="fas fa-wave-square mr-3 text-purple-600"></i>
-                                Waveform Results
-                            </h3>
-                            <p class="text-sm text-gray-600">Analysis and downloads</p>
-                        </div>
-
-                                <div id="result-magnitude" class="text-2xl font-bold text-blue-600">-</div>
-                            </div>
-                            <div class="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg">
-                                <div class="text-xs text-gray-600 mb-1">STATIONS</div>
-                                <div id="result-stations" class="text-2xl font-bold text-green-600">-</div>
-                            </div>
-                            <div class="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg">
-                                <div class="text-xs text-gray-600 mb-1">MAX PGA</div>
-                                <div id="result-max-pga" class="text-2xl font-bold text-orange-600">-</div>
-                            </div>
-                            <div class="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg">
-                                <div class="text-xs text-gray-600 mb-1">MAX PGV</div>
-                                <div id="result-max-pgv" class="text-2xl font-bold text-purple-600">-</div>
-                            </div>
-                        </div>
-                        
-                        <!-- Downloads Section -->
-                        <div id="waveform-downloads" class="hidden">
-                            <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                                <i class="fas fa-download mr-2 text-green-500"></i>
-                                Downloads
-                            </h4>
-                            
-                            <div class="space-y-3">
-                                <div class="bg-white border border-gray-200 rounded-lg p-4">
-                                    <h5 class="text-sm font-semibold text-gray-700 mb-3">Waveform Data</h5>
-                                    <div id="mseed-links" class="space-y-2"></div>
-                                </div>
-                                
-                                <div class="bg-white border border-gray-200 rounded-lg p-4">
-                                    <h5 class="text-sm font-semibold text-gray-700 mb-3">Analysis Data</h5>
-                                    <div id="data-links" class="space-y-2"></div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        </div>
-                    </div>
-                    
-                </div>
-                
-                <!-- RIGHT PANEL (70%) - VISUALIZATION -->
-                <div class="w-full md:w-2/3 flex flex-col">
-                    
-                    <!-- Kinematics Controls (shown at top when in kinematics mode) -->
-                    <div id="kinematics-controls" class="hidden bg-white border-b border-gray-200 p-4">
-                        <div class="flex flex-wrap gap-4 items-start">
-                            <!-- Visualization Selector -->
-                            <div id="kinematics-viz-selector" class="w-auto min-w-[180px] hidden">
-                                <label class="block text-xs font-medium text-gray-700 mb-1">Visualization Type</label>
-                                <select id="kinematics-viz-type" class="w-auto px-3 py-2 border border-gray-300 rounded" onchange="updateKinematicsVisualization()">
-                                    <option value="slip">Slip Distribution</option>
-                                    <option value="moment" selected>Moment Release</option>
-                                    <option value="rupture-time">Rupture Time</option>
-                                    <option value="stf">Source Time Function</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Computed Results Summary -->
-                            <div id="computed-summary" class="hidden bg-green-50 border border-green-200 rounded-lg p-4">
-                                <h4 class="font-semibold text-green-800 mb-2 text-sm">Computed Results</h4>
-                                <div class="text-sm text-gray-700 space-y-1.5">
-                                    <p><span class="font-medium">Avg Slip:</span> <span id="avg-slip-display" class="font-semibold">-</span> m</p>
-                                    <p><span class="font-medium">Total M₀:</span> <span id="total-moment-display" class="font-semibold">-</span> N·m</p>
-                                    <p><span class="font-medium">Computed Mw:</span> <span id="computed-mw-display" class="font-semibold">-</span></p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Tabs -->
-                    <div id="tabs-container" class="flex border-b border-gray-200 bg-white">
-                        <button id="tab-geometry" class="tab-button px-6 py-3 active" onclick="switchTab('geometry')">
-                            <i class="fas fa-cube mr-2"></i>Geometry
-                        </button>
-                    </div>
-                    
-                    <!-- Visualization Content -->
-                    <div class="flex-1 overflow-auto bg-gray-50">
-                        <div id="plot-container" class="w-full h-full p-2" style="min-height: 600px;">
-                        </div>
-                    </div>
-                    
-                </div>
-                
-            </div>
+          </div>
         </div>
+        <div id="waveform-status" class="hidden mb-2"></div>
+        <button id="view-waveforms-btn" onclick="viewWaveformResults()" class="hidden w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-green-700 transition mb-2">
+          <i class="fas fa-eye mr-1"></i>View Results
+        </button>
+      </div>
+
+    </div>
+    <div style="position:absolute; bottom:0; left:0; right:0; padding:12px 16px; background:white; border-top:1px solid #e5e7eb; box-shadow:0 -4px 12px rgba(0,0,0,0.08);">
+      <button onclick="computeWaveforms()" class="w-full py-2.5 rounded-xl font-bold text-white text-sm transition shadow-lg" style="background:linear-gradient(135deg,#059669,#0284c7);">
+        <i class="fas fa-calculator mr-2"></i>Compute Waveforms
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ FAULT PLANE BOTTOM OVERLAY — Steps 2+3 ═══ -->
+  <div id="fault-plane-overlay" style="position:fixed; left:0; right:0; bottom:0; height:0; z-index:700; background:#0f172a; transition:height 0.55s cubic-bezier(0.4,0,0.2,1); overflow:hidden; display:flex; flex-direction:column;">
+
+    <!-- Top bar -->
+    <div style="background:#1e293b; padding:10px 18px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; border-bottom:1px solid rgba(255,255,255,0.07);">
+      <button onclick="closeFaultPlaneOverlay()" class="flex items-center gap-1.5 text-slate-400 hover:text-white transition text-xs">
+        <i class="fas fa-chevron-down"></i>&nbsp;Map
+      </button>
+      <div class="flex rounded-lg overflow-hidden border border-slate-600 text-xs">
+        <button onclick="switchFaultTab('slip')" id="tab-slip" class="fault-tab-btn active px-3 py-1.5 bg-slate-700 text-white font-medium">Slip</button>
+        <button onclick="switchFaultTab('moment')" id="tab-moment" class="fault-tab-btn px-3 py-1.5 bg-transparent text-slate-400 hover:text-white transition">Moment</button>
+        <button onclick="switchFaultTab('rupture-time')" id="tab-rupture-time" class="fault-tab-btn px-3 py-1.5 bg-transparent text-slate-400 hover:text-white transition">Rupture Time</button>
+        <button onclick="switchFaultTab('stf')" id="tab-stf" class="fault-tab-btn px-3 py-1.5 bg-transparent text-slate-400 hover:text-white transition">STF</button>
+      </div>
+      <div id="computed-summary" class="hidden flex items-center gap-3 text-xs text-slate-300">
+        <span>Slip: <span id="avg-slip-display" class="text-blue-300 font-mono">-</span> m</span>
+        <span>M₀: <span id="total-moment-display" class="text-blue-300 font-mono">-</span></span>
+        <span class="font-bold">Mw <span id="computed-mw-display" class="text-cyan-300 font-mono">-</span></span>
+      </div>
     </div>
 
-    <!-- FOOTER -->
-    <footer class="bg-gray-800 text-white py-4 mt-auto">
-        <div class="container-fluid mx-auto px-6">
-            <div class="flex justify-between items-center">
-                <div class="flex gap-3">
-                    <button onclick="goHome()" class="px-5 py-2.5 text-white hover:text-gray-200 bg-gray-700 hover:bg-gray-600 rounded-lg transition flex items-center font-medium shadow-md">
-                        <i class="fas fa-home mr-2"></i>Home
-                    </button>
-                    <button id="confirm-geometry-btn" onclick="confirmGeometry()" class="px-5 py-2.5 text-white hover:text-gray-200 bg-green-600 hover:bg-green-700 rounded-lg transition flex items-center font-medium shadow-md hidden">
-                        <i class="fas fa-check mr-2"></i>Confirm Geometry
-                    </button>
-                    <button id="back-to-geometry-btn" onclick="backToGeometry()" class="px-5 py-2.5 text-white hover:text-gray-200 bg-blue-600 hover:bg-blue-500 rounded-lg transition flex items-center font-medium shadow-md hidden">
-                        <i class="fas fa-arrow-left mr-2"></i><span id="back-button-text">Back to Geometry</span>
-                    </button>
-                    <button id="compute-kinematics-btn" onclick="computeKinematics()" class="px-5 py-2.5 text-white hover:text-gray-200 bg-purple-600 hover:bg-purple-700 rounded-lg transition flex items-center font-medium shadow-md hidden">
-                        <i class="fas fa-calculator mr-2"></i>Compute Kinematics
-                    </button>
-                    <button id="proceed-subsources-btn" onclick="proceedToSubsources()" class="px-6 py-2.5 bg-green-600 text-white hover:bg-green-500 rounded-lg transition flex items-center font-semibold shadow-md hidden">
-                        Select Subsources<i class="fas fa-arrow-right ml-2"></i>
-                    </button>
-                    <button id="proceed-network-btn" onclick="proceedToSpatialSetup()" class="px-6 py-2.5 bg-green-600 text-white hover:bg-green-500 rounded-lg transition flex items-center font-semibold shadow-md hidden">
-                        Spatial Setup<i class="fas fa-arrow-right ml-2"></i>
-                    </button>
-                    <button id="view-waveforms-btn" onclick="viewWaveformResults()" class="px-6 py-2.5 bg-purple-600 text-white hover:bg-purple-500 rounded-lg transition flex items-center font-semibold shadow-md hidden">
-                        <i class="fas fa-chart-line mr-2"></i>View Results
-                    </button>
-                </div>
-                <div class="text-sm text-gray-300">
-                    © 2025 SWEET - Finite fault waveform simulation tool
-                </div>
-            </div>
+    <!-- Fault plane Plotly chart -->
+    <div id="plot-container" style="flex:1; min-height:0; overflow:hidden;"></div>
+
+    <!-- Source grouping section -->
+    <div id="subsource-section" style="background:#1e293b; border-top:1px solid rgba(255,255,255,0.07); padding:12px 18px; flex-shrink:0;">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+          <i class="fas fa-layer-group text-indigo-400"></i>Source Grouping
+        </h4>
+        <div class="flex items-center gap-3 text-xs text-slate-400">
+          <span>Patches: <span id="total-patches" class="text-white font-mono">-</span></span>
+          <span>Subsources: <span id="selected-patches" class="text-indigo-300 font-bold">-</span></span>
+          <span>Avg/group: <span id="subsource-coverage" class="text-white font-mono">-</span></span>
         </div>
-    </footer>
+      </div>
+      <div class="flex items-center gap-3 mb-2">
+        <label class="text-xs text-slate-400 whitespace-nowrap">Target Mw: <span id="subsource-mag-value" class="text-indigo-300 font-bold">6.0</span></label>
+        <input type="range" id="subsource-magnitude" min="5.0" max="6.5" step="0.1" value="6.0" class="flex-1" oninput="updateSubsourceGrouping()">
+      </div>
+      <div id="magnitude-histogram" style="height:110px;"></div>
+    </div>
+
+    <!-- Proceed bar -->
+    <div style="background:#0f172a; padding:10px 18px; display:flex; justify-content:flex-end; flex-shrink:0; border-top:1px solid rgba(255,255,255,0.05);">
+      <button id="proceed-subsources-btn" onclick="acceptGroupingAndProceed()" class="hidden px-5 py-2 rounded-xl font-bold text-white text-xs transition" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);">
+        <i class="fas fa-layer-group mr-1.5"></i>Accept & Set Up Stations
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ RESULTS BOTTOM OVERLAY — Step 5 ═══ -->
+  <div id="results-overlay" style="position:fixed; left:0; right:0; bottom:0; height:0; z-index:700; background:#f8fafc; transition:height 0.55s cubic-bezier(0.4,0,0.2,1); overflow:hidden; display:flex; flex-direction:column;">
+    <div style="background:linear-gradient(90deg,#1e3a5f,#2d1b69); padding:10px 18px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+      <button onclick="closeResultsOverlay()" class="flex items-center gap-1.5 text-white/60 hover:text-white transition text-xs">
+        <i class="fas fa-chevron-down"></i>&nbsp;Back
+      </button>
+      <span class="text-white font-bold text-sm">Waveform Results</span>
+      <div class="flex items-center gap-3 text-xs text-white/80">
+        <span>Mw&nbsp;<span id="result-magnitude" class="text-white font-bold font-mono">-</span></span>
+        <span>N=<span id="result-stations" class="text-white font-bold">-</span></span>
+        <span>PGA<sub>max</sub>=<span id="result-max-pga" class="text-orange-300 font-bold">-</span>&nbsp;m/s²</span>
+        <span>PGV<sub>max</sub>=<span id="result-max-pgv" class="text-purple-300 font-bold">-</span>&nbsp;m/s</span>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto panel-scroll bg-gray-50">
+      <div id="plot-container-results" style="padding:12px;"></div>
+      <div id="waveform-downloads" class="hidden px-5 pb-5">
+        <h4 class="font-semibold text-gray-700 mb-3 text-sm flex items-center gap-2"><i class="fas fa-download text-green-500"></i>Downloads</h4>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white border border-gray-200 rounded-lg p-3">
+            <h5 class="text-xs font-semibold text-gray-600 mb-2">Waveform Files</h5>
+            <div id="mseed-links" class="space-y-1.5"></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-lg p-3">
+            <h5 class="text-xs font-semibold text-gray-600 mb-2">Analysis Data</h5>
+            <div id="data-links" class="space-y-1.5"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ABOUT MODAL ═══ -->
+  <div id="about-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[900] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-2xl">
+        <div class="flex justify-between items-center">
+          <h2 class="text-2xl font-bold flex items-center"><i class="fas fa-info-circle mr-3"></i>About SWEET</h2>
+          <button onclick="closeAbout()" class="text-white hover:text-gray-200 text-2xl"><i class="fas fa-times"></i></button>
+        </div>
+      </div>
+      <div class="p-8 space-y-6">
+        <div>
+          <h3 class="text-xl font-bold text-gray-800 mb-3">Synthetic Waveform Emulator</h3>
+          <p class="text-gray-700 leading-relaxed">SWEET is an interactive web app for finite fault modeling and synthetic seismic waveform generation. Design earthquake rupture scenarios through a map-first workflow: set parameters directly on the map, inspect the fault plane kinematics in an immersive face-on view, group subsources, define a station network, and compute broadband synthetic waveforms.</p>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-gray-800 mb-2">Workflow</h3>
+          <div class="flex flex-wrap gap-2">
+            <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">1. Rupture Setup</span>
+            <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">2. Kinematics Plane</span>
+            <span class="px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm font-medium">3. Source Grouping</span>
+            <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">4. Stations</span>
+            <span class="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">5. Waveforms</span>
+          </div>
+        </div>
+        <div class="border-t pt-4">
+          <p class="text-gray-600 text-sm"><strong>Author:</strong> Francesco Acolosimo<br><strong>Version:</strong> 2.0 (experimental)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden compatibility elements -->
+  <input type="file" id="station-file-input" accept=".csv,.txt" class="hidden" onchange="handleStationFileSelect(this)">
+  <select id="kinematics-viz-type" class="hidden">
+    <option value="slip" selected>Slip Distribution</option>
+    <option value="moment">Moment Release</option>
+    <option value="rupture-time">Rupture Time</option>
+    <option value="stf">Source Time Function</option>
+  </select>
+
 
     <script>
         let currentMode = null;
         let currentTab = 'geometry';
         let faultData = null;
-        
+
+        // ══════════════════════════════════════════════════════
+        //  LEAFLET MAP — initialization and projection
+        // ══════════════════════════════════════════════════════
+        let leafletMap = null;
+        let epicenterMarker = null;
+        let faultPolygon = null;
+        let stationLayerGroup = null;
+        let mapClickEnabled = false;
+
+        function initLeafletMap() {
+            if (leafletMap) return;
+            leafletMap = L.map('leaflet-map', { zoomControl: false }).setView([45, 15], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(leafletMap);
+            L.control.zoom({ position: 'topright' }).addTo(leafletMap);
+            stationLayerGroup = L.layerGroup().addTo(leafletMap);
+            leafletMap.on('click', function(e) {
+                if (mapClickEnabled) setEpicenter(e.latlng.lat, e.latlng.lng);
+            });
+        }
+
+        function setEpicenter(lat, lng) {
+            document.getElementById('hypo-lat').value = lat.toFixed(4);
+            document.getElementById('hypo-lon').value = lng.toFixed(4);
+            updateMapProjection();
+        }
+
+        function computeFaultCornersFromInputs() {
+            const lat    = parseFloat(document.getElementById('hypo-lat').value)    || 45;
+            const lon    = parseFloat(document.getElementById('hypo-lon').value)    || 15;
+            const strike = parseFloat(document.getElementById('strike').value)      || 0;
+            const length = parseFloat(document.getElementById('length-val').value)  || 100;
+            const width  = parseFloat(document.getElementById('width-val').value)   || 30;
+            const dip    = parseFloat(document.getElementById('dip-val').value)     || 45;
+            const sRad = strike * Math.PI / 180;
+            const dRad = dip    * Math.PI / 180;
+            const half = length / 2;
+            const cLat = Math.cos(lat * Math.PI / 180);
+            const dLat = (half * Math.cos(sRad)) / 111.0;
+            const dLon = (half * Math.sin(sRad)) / (111.0 * cLat);
+            const pRad = sRad - Math.PI / 2;
+            const hDip = width * Math.cos(dRad);
+            const ipLat = (hDip * Math.cos(pRad)) / 111.0;
+            const ipLon = (hDip * Math.sin(pRad)) / (111.0 * cLat);
+            return [
+                [lat - dLat,         lon - dLon],
+                [lat + dLat,         lon + dLon],
+                [lat + dLat + ipLat, lon + dLon + ipLon],
+                [lat - dLat + ipLat, lon - dLon + ipLon]
+            ];
+        }
+
+        function updateMapProjection() {
+            if (!leafletMap) return;
+            const lat = parseFloat(document.getElementById('hypo-lat').value);
+            const lon = parseFloat(document.getElementById('hypo-lon').value);
+            if (isNaN(lat) || isNaN(lon)) return;
+
+            if (epicenterMarker) { leafletMap.removeLayer(epicenterMarker); epicenterMarker = null; }
+            if (faultPolygon)    { leafletMap.removeLayer(faultPolygon);    faultPolygon = null; }
+
+            const corners = computeFaultCornersFromInputs();
+            faultPolygon = L.polygon(corners, {
+                color: 'rgba(220,50,50,0.9)',
+                weight: 2.5,
+                fillColor: '#dc3232',
+                fillOpacity: 0.15
+            }).bindTooltip('Fault surface projection').addTo(leafletMap);
+
+            epicenterMarker = L.marker([lat, lon], {
+                icon: L.divIcon({
+                    html: '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 1px 4px rgba(0,0,0,0.6));">⭐</div>',
+                    className: '',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                }),
+                zIndexOffset: 1000
+            }).bindTooltip(`Epicenter: ${lat.toFixed(3)}°N, ${lon.toFixed(3)}°E`).addTo(leafletMap);
+        }
+
+        // ══════════════════════════════════════════════════════
+        //  OVERLAY MANAGEMENT
+        // ══════════════════════════════════════════════════════
+        function showFaultPlaneOverlay() {
+            document.getElementById('fault-panel').classList.add('hidden');
+            requestAnimationFrame(() => {
+                document.getElementById('fault-plane-overlay').style.height = '82vh';
+            });
+        }
+
+        function closeFaultPlaneOverlay() {
+            document.getElementById('fault-plane-overlay').style.height = '0';
+            document.getElementById('fault-panel').classList.remove('hidden');
+        }
+
+        function showResultsOverlay() {
+            document.getElementById('spatial-setup-panel').classList.add('hidden');
+            requestAnimationFrame(() => {
+                document.getElementById('results-overlay').style.height = '85vh';
+            });
+        }
+
+        function closeResultsOverlay() {
+            document.getElementById('results-overlay').style.height = '0';
+            document.getElementById('spatial-setup-panel').classList.remove('hidden');
+        }
+
+        function backToFaultPlane() {
+            document.getElementById('spatial-setup-panel').classList.add('hidden');
+            showFaultPlaneOverlay();
+        }
+
+        function switchFaultTab(tab) {
+            document.querySelectorAll('.fault-tab-btn').forEach(btn => {
+                btn.classList.remove('bg-slate-700', 'text-white', 'active');
+                btn.classList.add('bg-transparent', 'text-slate-400');
+            });
+            const active = document.getElementById('tab-' + tab);
+            if (active) {
+                active.classList.add('active', 'bg-slate-700', 'text-white');
+                active.classList.remove('bg-transparent', 'text-slate-400');
+            }
+            if (tab === 'slip')              visualize('slip');
+            else if (tab === 'moment')       visualize('moment');
+            else if (tab === 'rupture-time') visualizeRuptureTime();
+            else if (tab === 'stf')          visualizeSTF();
+        }
+
+        // ══════════════════════════════════════════════════════
+        //  WORKFLOW ENTRY POINTS
+        // ══════════════════════════════════════════════════════
+        function runKinematics() {
+            computeKinematics();
+        }
+
+        function acceptGroupingAndProceed() {
+            proceedToSpatialSetup();
+        }
+
         // Update progress steps indicator
         function updateProgressSteps(step) {
-            // Show progress steps
-            document.getElementById('progress-steps').classList.remove('hidden');
-            
-            // Reset all steps
-            for (let i = 1; i <= 4; i++) {
+            const el = document.getElementById('progress-steps');
+            if (el) el.style.display = 'flex';
+            for (let i = 1; i <= 5; i++) {
                 const stepEl = document.getElementById(`step-${i}`);
+                if (!stepEl) continue;
                 const circle = stepEl.querySelector('div');
-                const label = stepEl.querySelector('span');
-                
+                const label  = stepEl.querySelector('span');
                 if (i < step) {
-                    // Completed step
-                    circle.className = 'w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-sm font-bold';
-                    label.className = 'ml-2 text-sm font-medium';
+                    circle.className = 'w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-xs font-bold text-white';
+                    if (label) label.className = 'text-white/90 hidden md:block';
                 } else if (i === step) {
-                    // Current step
-                    circle.className = 'w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center text-sm font-bold text-gray-900';
-                    label.className = 'ml-2 text-sm font-medium';
+                    circle.className = 'w-6 h-6 rounded-full bg-yellow-400 flex items-center justify-center text-xs font-bold text-gray-900';
+                    if (label) label.className = 'text-white hidden md:block';
                 } else {
-                    // Future step
-                    circle.className = 'w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold';
-                    label.className = 'ml-2 text-sm font-medium text-white/50';
+                    circle.className = 'w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-xs font-bold text-white';
+                    if (label) label.className = 'text-white/40 hidden md:block';
                 }
             }
         }
@@ -727,34 +614,40 @@
         // Mode selection
         function selectMode(mode) {
             currentMode = mode;
-            document.getElementById('landing-page').classList.add('hidden');
-            document.getElementById('workspace').classList.remove('hidden');
-            
-            // Initialize rake mechanism label
+            window.isGeoJSONMode = (mode === 'geojson');
+
+            // Hide landing, show map
+            document.getElementById('landing-page').style.display = 'none';
+            initLeafletMap();
+            mapClickEnabled = true;
+            document.getElementById('map-click-hint').classList.remove('hidden');
+
+            // Show fault setup panel
+            const fp = document.getElementById('fault-panel');
+            fp.classList.remove('hidden');
+            document.getElementById('fault-panel-footer').classList.remove('hidden');
+
             updateRakeMechanism();
-            
-            // Update progress to step 1
             updateProgressSteps(1);
-            
-            // Show confirm geometry button
-            document.getElementById('confirm-geometry-btn').classList.remove('hidden');
-            
+
             if (mode === 'geojson') {
                 document.getElementById('geojson-inputs').classList.remove('hidden');
                 document.getElementById('synthetic-inputs').classList.add('hidden');
             } else {
                 document.getElementById('geojson-inputs').classList.add('hidden');
                 document.getElementById('synthetic-inputs').classList.remove('hidden');
-                previewGeometry();
+                generateFault();
+                updateMapProjection();
+                // Center map on initial epicenter
+                const lat = parseFloat(document.getElementById('hypo-lat').value) || 45;
+                const lon = parseFloat(document.getElementById('hypo-lon').value) || 15;
+                leafletMap.setView([lat, lon], 7);
             }
         }
 
         // Reset application to landing page
         function resetApplication() {
-            // Confirm reset action
-            if (!confirm('Are you sure you want to start a new scenario? All current work will be lost.')) {
-                return;
-            }
+            if (!confirm('Are you sure you want to start a new scenario? All current work will be lost.')) return;
             
             // Clear all global state variables
             currentWaveformResult = null;
@@ -776,135 +669,44 @@
             }
             progressStartTime = null;
             
-            // Hide workspace and show landing page
-            document.getElementById('workspace').classList.add('hidden');
-            document.getElementById('landing-page').classList.remove('hidden');
-            document.getElementById('progress-steps').classList.add('hidden');
-            
-            // Hide all panels
-            document.getElementById('geometry-panel').style.transform = 'translateX(0)';
-            document.getElementById('kinematics-panel').style.transform = 'translateX(100%)';
-            document.getElementById('subsources-panel').style.transform = 'translateX(100%)';
-            document.getElementById('stations-panel').style.transform = 'translateX(100%)';
-            document.getElementById('waveforms-panel').style.transform = 'translateX(100%)';
-            
-            // Reset tabs to geometry
-            const buttons = document.querySelectorAll('.tab-button');
-            buttons.forEach((btn, index) => {
-                if (index === 0) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-            
-            // Clear plot container
-            const plotContainer = document.getElementById('plot-container');
-            if (plotContainer) {
-                plotContainer.innerHTML = '';
-                plotContainer.style.backgroundColor = '#f3f4f6';
-            }
-            
-            // Clear any Plotly plots
-            if (window.Plotly && plotContainer) {
-                try {
-                    Plotly.purge('plot-container');
-                } catch (e) {
-                    console.log('No plot to purge');
-                }
-            }
-            
-            // Reset forms and inputs
-            document.querySelectorAll('input[type="number"]').forEach(input => {
-                if (input.defaultValue) {
-                    input.value = input.defaultValue;
-                }
-            });
-            
-            // Clear file inputs
-            document.querySelectorAll('input[type="file"]').forEach(input => {
-                input.value = '';
-            });
-            
-            // Hide all action buttons
-            const confirmGeometryBtn = document.getElementById('confirm-geometry-btn');
-            if (confirmGeometryBtn) confirmGeometryBtn.classList.add('hidden');
-            
-            // Reset all input fields and controls to defaults
-            document.querySelectorAll('select').forEach(select => {
-                if (select.options.length > 0) {
-                    select.selectedIndex = 0;
-                }
-            });
-            
-            // Hide computed results sections
+            // Hide all panels, show landing
+            document.getElementById('landing-page').style.display = 'flex';
+            document.getElementById('fault-panel').classList.add('hidden');
+            document.getElementById('spatial-setup-panel').classList.add('hidden');
+            document.getElementById('fault-plane-overlay').style.height = '0';
+            document.getElementById('results-overlay').style.height = '0';
+            document.getElementById('map-click-hint').classList.add('hidden');
+            document.getElementById('progress-steps').style.display = 'none';
+            mapClickEnabled = false;
+
+            // Clear Leaflet map markers
+            if (stationLayerGroup) stationLayerGroup.clearLayers();
+            if (epicenterMarker) { if (leafletMap) leafletMap.removeLayer(epicenterMarker); epicenterMarker = null; }
+            if (faultPolygon)    { if (leafletMap) leafletMap.removeLayer(faultPolygon);    faultPolygon = null; }
+
+            // Clear Plotly
+            try { Plotly.purge('plot-container'); } catch(e) {}
+            try { Plotly.purge('plot-container-results'); } catch(e) {}
+
             document.getElementById('computed-summary').classList.add('hidden');
-            document.getElementById('kinematics-viz-selector').classList.add('hidden');
-            
-            // Hide waveform results sections
+
             const waveformDownloads = document.getElementById('waveform-downloads');
-            if (waveformDownloads) {
-                waveformDownloads.classList.add('hidden');
-            }
+            if (waveformDownloads) waveformDownloads.classList.add('hidden');
             
-            // Clear waveform result displays
             document.getElementById('result-magnitude').textContent = '-';
             document.getElementById('result-stations').textContent = '-';
             document.getElementById('result-max-pga').innerHTML = '-';
             document.getElementById('result-max-pgv').innerHTML = '-';
-            
-            // Clear download links
-            const mseedLinks = document.getElementById('mseed-links');
-            if (mseedLinks) mseedLinks.innerHTML = '';
-            const dataLinks = document.getElementById('data-links');
-            if (dataLinks) dataLinks.innerHTML = '';
-            
-            // Clear station list
-            const stationList = document.getElementById('station-list');
-            if (stationList) stationList.classList.add('hidden');
-            const stationItems = document.getElementById('station-items');
-            if (stationItems) stationItems.innerHTML = '';
-            const stationCount = document.getElementById('station-count');
-            if (stationCount) stationCount.textContent = '0';
-            
-            // Clear subsource list
-            const subsourceList = document.getElementById('subsource-list');
-            if (subsourceList) subsourceList.innerHTML = '';
-            const subsourceCount = document.getElementById('subsource-count');
-            if (subsourceCount) subsourceCount.textContent = '0';
-            
-            // Hide status messages
-            const waveformStatus = document.getElementById('waveform-status');
-            if (waveformStatus) waveformStatus.classList.add('hidden');
-            
-            // Clear progress display
-            const progressPercent = document.getElementById('progress-percent');
-            if (progressPercent) progressPercent.textContent = '0%';
-            const progressBar = document.getElementById('progress-bar');
-            if (progressBar) progressBar.style.width = '0%';
-            const progressTime = document.getElementById('progress-time');
-            if (progressTime) progressTime.textContent = '0s';
-            
-            // Clear any spatial map
-            const spatialMapContainer = document.getElementById('spatial-map-container');
-            if (spatialMapContainer) spatialMapContainer.classList.add('hidden');
-            const spatialMap = document.getElementById('spatial-map');
-            if (spatialMap && window.Plotly) {
-                try {
-                    Plotly.purge('spatial-map');
-                } catch (e) {
-                    console.log('No spatial map to purge');
-                }
-            }
-            
-            // Reset subsources data
-            window.subsourcesData = [];
-            window.geojsonPatches = [];
-            window.stationsData = [];
-            window.eventMetadata = null;
-            window.isGeoJSONMode = false;
-            
-            console.log('Application reset to landing page');
+            const mseedLinks = document.getElementById('mseed-links'); if (mseedLinks) mseedLinks.innerHTML = '';
+            const dataLinks  = document.getElementById('data-links');  if (dataLinks)  dataLinks.innerHTML  = '';
+            const stationList  = document.getElementById('station-list');  if (stationList)  stationList.classList.add('hidden');
+            const stationItems = document.getElementById('station-items'); if (stationItems) stationItems.innerHTML = '';
+            const stationCount = document.getElementById('station-count'); if (stationCount) stationCount.textContent = '0';
+            const waveformStatus = document.getElementById('waveform-status'); if (waveformStatus) waveformStatus.classList.add('hidden');
+            window.subsourcesData = []; window.geojsonPatches = []; window.stationsData = [];
+            window.eventMetadata = null; window.isGeoJSONMode = false;
+            currentMode = null; faultData = null;
+            console.log('Application reset.');
         }
 
         // Tab switching
@@ -932,13 +734,7 @@
             input.value = slider.value;
             
             if (currentMode === 'synthetic') {
-                const kinematicsVisible = document.getElementById('kinematics-panel').style.transform === 'translateX(0px)';
-                
-                // If kinematics panel is NOT visible, preview geometry only
-                if (!kinematicsVisible) {
-                    previewGeometry();
-                }
-                // In kinematics mode, parameters don't auto-regenerate - user must click Compute
+                updateMapProjection();
             }
         }
         
@@ -948,13 +744,7 @@
             slider.value = input.value;
             
             if (currentMode === 'synthetic') {
-                const kinematicsVisible = document.getElementById('kinematics-panel').style.transform === 'translateX(0px)';
-                
-                // If kinematics panel is NOT visible, preview geometry only
-                if (!kinematicsVisible) {
-                    previewGeometry();
-                }
-                // In kinematics mode, parameters don't auto-regenerate - user must click Compute
+                updateMapProjection();
             }
         }
         
@@ -1041,23 +831,8 @@
                 magInfo.classList.remove('hidden');
             }
             
-            // Slide panels
-            document.getElementById('geometry-panel').style.transform = 'translateX(-100%)';
-            document.getElementById('kinematics-panel').style.transform = 'translateX(0)';
-            
-            // Hide confirm geometry button and show back button
-            document.getElementById('confirm-geometry-btn').classList.add('hidden');
-            document.getElementById('back-to-geometry-btn').classList.remove('hidden');
-            document.getElementById('compute-kinematics-btn').classList.remove('hidden');
-            
-            // Hide geometry tab in kinematics mode
-            document.getElementById('tab-geometry').classList.add('hidden');
-            
-            // Show kinematics controls at top
-            document.getElementById('kinematics-controls').classList.remove('hidden');
-            
-            // Clear visualization
-            document.getElementById('plot-container').innerHTML = '<div class="flex items-center justify-center h-full text-gray-400"><div class="text-center"><i class="fas fa-calculator text-6xl mb-4"></i><p class="text-lg">Click Compute Kinematics to generate fault model</p></div></div>';
+            // Update map projection with new geometry
+            updateMapProjection();
         }
         
         // Compute kinematics with current parameters
@@ -1122,44 +897,26 @@
                 document.getElementById('computed-summary').classList.remove('hidden');
             }
             
-            // Show visualization selector and tabs
-            document.getElementById('kinematics-viz-selector').classList.remove('hidden');
-            
-            // Show Subsources button
+            // Show the Accept & proceed button
             document.getElementById('proceed-subsources-btn').classList.remove('hidden');
             
-            // Get selected visualization type
-            const vizType = document.getElementById('kinematics-viz-type').value;
-            updateKinematicsVisualization();
+            // Fly map to fault bounds, then show fault-plane overlay
+            if (leafletMap && faultPolygon) {
+                leafletMap.flyToBounds(faultPolygon.getBounds().pad(0.4), { duration: 1.2 });
+            }
+            setTimeout(() => {
+                showFaultPlaneOverlay();
+                setTimeout(() => {
+                    switchFaultTab('slip');
+                    updateSubsourceGrouping();
+                }, 350);
+            }, 600);
         }
         
-        // Proceed to Subsources
+        // Proceed to Subsources — in new layout grouping is inline in the overlay
         function proceedToSubsources() {
-            // Slide panels
-            document.getElementById('kinematics-panel').style.transform = 'translateX(-100%)';
-            document.getElementById('subsources-panel').style.transform = 'translateX(0)';
-            
-            // Hide Subsources button and Compute Kinematics button
-            document.getElementById('proceed-subsources-btn').classList.add('hidden');
-            document.getElementById('compute-kinematics-btn').classList.add('hidden');
-            
-            // Show Spatial Setup button
-            document.getElementById('proceed-network-btn').classList.remove('hidden');
-            
-            // Hide kinematics controls
-            document.getElementById('kinematics-controls').classList.add('hidden');
-            
-            // Update back button text
-            document.getElementById('back-button-text').textContent = 'Back to Kinematics';
-            
-            // Update progress to step 3
             updateProgressSteps(3);
-            
-            // Initialize subsources display and calculate grouping
             updateSubsourceGrouping();
-            
-            // Visualize subsources
-            visualizeSubsources();
         }
         
         // Calculate maximum seismic moment for a patch based on stress-drop limit
@@ -1596,238 +1353,52 @@
         
         // Proceed to Spatial Setup
         function proceedToSpatialSetup() {
-            // Slide panels
-            document.getElementById('subsources-panel').style.transform = 'translateX(-100%)';
-            document.getElementById('spatial-panel').style.transform = 'translateX(0)';
-            
-            // Hide Spatial Setup button
-            document.getElementById('proceed-network-btn').classList.add('hidden');
-            
-            // Update back button text
-            document.getElementById('back-button-text').textContent = 'Back to Subsources';
-            
-            // Update progress to step 4
+            // Close fault plane overlay, show spatial setup panel
+            document.getElementById('fault-plane-overlay').style.height = '0';
+            document.getElementById('fault-panel').classList.add('hidden');
+
             updateProgressSteps(4);
-            
-            // Show map visualization
-            visualizeMap();
+
+            // Update the read-only location display in spatial panel
+            const lat = document.getElementById('hypo-lat').value;
+            const lon = document.getElementById('hypo-lon').value;
+            const str = document.getElementById('strike').value;
+            document.getElementById('spatial-hypo-lat-display').textContent = parseFloat(lat).toFixed(3) + '°';
+            document.getElementById('spatial-hypo-lon-display').textContent = parseFloat(lon).toFixed(3) + '°';
+            document.getElementById('spatial-strike-display').textContent = str + '°';
+
+            document.getElementById('spatial-setup-panel').classList.remove('hidden');
+
+            // Update Leaflet to show fault projection
+            updateMapProjection();
         }
         
         // Update map with station markers
         function updateMapWithStations(stations) {
-            console.log('updateMapWithStations called with', stations.length, 'stations');
-            
-            // Add station markers to the existing map
-            if (!stations || stations.length === 0) {
-                console.log('No stations to display');
-                return;
-            }
+            if (!leafletMap || !stationLayerGroup) return;
+            stationLayerGroup.clearLayers();
+            if (!stations || stations.length === 0) return;
 
-            // Filter out stations with invalid coordinates
-            const validStations = stations.filter(s => 
-                s.lat !== undefined && !isNaN(s.lat) && 
-                s.lon !== undefined && !isNaN(s.lon)
-            );
-            
-            if (validStations.length === 0) {
-                console.log('No stations with valid coordinates');
-                return;
-            }
-
-            // Extract station coordinates
-            const stationLats = validStations.map(s => s.lat);
-            const stationLons = validStations.map(s => s.lon);
-            const stationNames = validStations.map(s => s.name);
-            
-            console.log('Station lats:', stationLats.slice(0, 3));
-            console.log('Station lons:', stationLons.slice(0, 3));
-            
-            // Create hover text with station details
-            const hoverText = validStations.map(s => {
-                let text = `${s.name}<br>Lat: ${s.lat.toFixed(4)}°<br>Lon: ${s.lon.toFixed(4)}°`;
-                if (s.distance !== undefined) {
-                    text += `<br>Distance: ${s.distance} km`;
-                }
-                return text;
-            });
-
-            // Station trace
-            const stationTrace = {
-                type: 'scattermapbox',
-                mode: 'markers',
-                lon: stationLons,
-                lat: stationLats,
-                marker: {
-                    size: 12,
-                    color: '#00FFFF',
-                    opacity: 1
-                },
-                hovertext: hoverText,
-                hoverinfo: 'text',
-                name: '▲ Stations',
-                showlegend: true
-            };
-
-            console.log('Station trace created:', stationTrace);
-
-            // Station text overlays
-            const stationTextTrace = {
-                type: 'scattermapbox',
-                mode: 'text',
-                lon: stationLons,
-                lat: stationLats,
-                text: stationNames.map(() => '▲'),
-                textfont: {
-                    size: 10,
-                    color: '#0066CC'
-                },
-                hoverinfo: 'skip',
-                showlegend: false
-            };
-
-            // Get current plot data
-            const plotDiv = document.getElementById('plot-container');
-            console.log('plotDiv:', plotDiv);
-            console.log('plotDiv.data:', plotDiv.data);
-            
-            // Check if plotDiv has a data property (plot exists)
-            if (plotDiv && plotDiv.data && plotDiv.data.length > 0) {
-                console.log('Current plot has', plotDiv.data.length, 'traces');
-                
-                // Remove existing station traces if they exist (indices 2 and 3)
-                if (plotDiv.data.length > 2) {
-                    console.log('Deleting existing station traces');
-                    Plotly.deleteTraces('plot-container', [2, 3]);
-                }
-                
-                // Add new station traces
-                console.log('Adding new station traces');
-                Plotly.addTraces('plot-container', [stationTrace, stationTextTrace]);
-            } else {
-                console.error('Map not initialized. Call visualizeMap() first.');
-                console.error('plotDiv exists:', !!plotDiv);
-                console.error('plotDiv.data exists:', plotDiv && !!plotDiv.data);
-            }
+            stations.filter(s => s.lat !== undefined && !isNaN(s.lat) && s.lon !== undefined && !isNaN(s.lon))
+                    .forEach(s => {
+                        const marker = L.circleMarker([s.lat, s.lon], {
+                            radius: 7,
+                            color: '#0ea5e9',
+                            fillColor: '#38bdf8',
+                            fillOpacity: 0.85,
+                            weight: 1.5
+                        });
+                        let tip = `<b>${s.name}</b><br>${s.lat.toFixed(3)}°, ${s.lon.toFixed(3)}°`;
+                        if (s.distance !== undefined) tip += `<br>Dist: ${typeof s.distance === 'number' ? s.distance.toFixed(1) : s.distance} km`;
+                        if (s.vs30 !== undefined) tip += `<br>Vs30: ${typeof s.vs30 === 'number' ? s.vs30.toFixed(0) : s.vs30} m/s`;
+                        marker.bindTooltip(tip);
+                        stationLayerGroup.addLayer(marker);
+                    });
         }
         
-        // Visualize map with fault and stations
+        // Visualize map — in new layout the Leaflet map is always live; just update projection
         function visualizeMap() {
-            const hypoLat = parseFloat(document.getElementById('hypo-lat').value);
-            const hypoLon = parseFloat(document.getElementById('hypo-lon').value);
-            const strike = parseFloat(document.getElementById('strike').value);
-            const length = faultData.length;
-            const width = faultData.width;
-            const dip = faultData.dip;
-            
-            // Get hypocenter position from kinematics if available
-            const hypoAlong = window.globalKinematicsResult ? window.globalKinematicsResult.hypo_along : 0.5;
-            const hypoDown = window.globalKinematicsResult ? window.globalKinematicsResult.hypo_down : 0.5;
-            
-            // Calculate fault trace on surface
-            const strikeRad = strike * Math.PI / 180;
-            const dipRad = dip * Math.PI / 180;
-            
-            // Calculate all 4 projected corners of the fault plane
-            const halfLength = length / 2;
-            const deltaLat1 = (halfLength * Math.cos(strikeRad)) / 111.0;
-            const deltaLon1 = (halfLength * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
-
-            const perpRad0 = strikeRad - Math.PI / 2;
-            const horizontalDip0 = width * Math.cos(dipRad);
-            const dipOffsetLat0 = (horizontalDip0 * Math.cos(perpRad0)) / 111.0;
-            const dipOffsetLon0 = (horizontalDip0 * Math.sin(perpRad0)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
-
-            // Calculate actual hypocenter position based on along-strike and down-dip
-            const alongStrikeDist = (hypoAlong - 0.5) * length;  // km from center
-            const downDipDist = hypoDown * width;  // km from top
-            
-            // Along-strike offset from center
-            const hypoLatOffset = (alongStrikeDist * Math.cos(strikeRad)) / 111.0;
-            const hypoLonOffset = (alongStrikeDist * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
-            
-            // Down-dip offset (perpendicular to strike, dipping down)
-            const perpStrike = strikeRad - Math.PI / 2;  // perpendicular direction
-            const horizontalDownDip = downDipDist * Math.cos(dipRad);  // horizontal component
-            const hypoLatOffsetDip = (horizontalDownDip * Math.cos(perpStrike)) / 111.0;
-            const hypoLonOffsetDip = (horizontalDownDip * Math.sin(perpStrike)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
-            
-            const actualHypoLat = hypoLat + hypoLatOffset + hypoLatOffsetDip;
-            const actualHypoLon = hypoLon + hypoLonOffset + hypoLonOffsetDip;
-            const actualHypoDepth = downDipDist * Math.sin(dipRad);
-            
-            // Create fault projection polygon (all 4 corners of the fault plane)
-            const mfc0lat = hypoLat - deltaLat1,  mfc0lon = hypoLon - deltaLon1;
-            const mfc1lat = hypoLat + deltaLat1,  mfc1lon = hypoLon + deltaLon1;
-            const mfc2lat = mfc1lat + dipOffsetLat0, mfc2lon = mfc1lon + dipOffsetLon0;
-            const mfc3lat = mfc0lat + dipOffsetLat0, mfc3lon = mfc0lon + dipOffsetLon0;
-
-            const faultTrace = {
-                type: 'scattermapbox',
-                mode: 'lines',
-                lon: [mfc0lon, mfc1lon, mfc2lon, mfc3lon, mfc0lon],
-                lat: [mfc0lat, mfc1lat, mfc2lat, mfc3lat, mfc0lat],
-                line: { color: 'rgba(220,50,50,0.9)', width: 3 },
-                name: 'Fault Projection',
-                hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra>Fault</extra>',
-                showlegend: true
-            };
-
-            // GeoJSON polygon for filled fault area (mapbox layer)
-            const faultGeoJSON = {
-                type: 'FeatureCollection',
-                features: [{ type: 'Feature', geometry: {
-                    type: 'Polygon',
-                    coordinates: [[[mfc0lon,mfc0lat],[mfc1lon,mfc1lat],[mfc2lon,mfc2lat],[mfc3lon,mfc3lat],[mfc0lon,mfc0lat]]]
-                }}]
-            };
-
-            const faultFillLayer = {
-                sourcetype: 'geojson',
-                source: faultGeoJSON,
-                type: 'fill',
-                color: 'rgba(220,50,50,0.20)'
-            };
-
-            const faultLineLayer = {
-                sourcetype: 'geojson',
-                source: faultGeoJSON,
-                type: 'line',
-                color: 'rgba(220,50,50,0.9)',
-                line: { width: 3 }
-            };
-            
-            // Add hypocenter marker at actual position
-            const hypocenter = {
-                type: 'scattermapbox',
-                mode: 'markers',
-                lon: [actualHypoLon],
-                lat: [actualHypoLat],
-                marker: {
-                    size: 18,
-                    color: '#FFD700',
-                    opacity: 1
-                },
-                name: '⭐ Hypocenter',
-                hovertemplate: `Hypocenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<br>Depth: ${actualHypoDepth.toFixed(1)} km<extra></extra>`,
-                showlegend: true
-            };
-            
-            const data = [faultTrace, hypocenter];
-            
-            const layout = {
-                mapbox: {
-                    style: 'open-street-map',
-                    center: { lat: hypoLat, lon: hypoLon },
-                    zoom: 8,
-                    layers: [faultFillLayer, faultLineLayer]
-                },
-                title: 'Fault Location Map',
-                showlegend: true,
-                height: 750,
-                margin: {l: 0, r: 0, t: 40, b: 0}
-            };
-            
-            Plotly.newPlot('plot-container', data, layout);
+            updateMapProjection();
         }
         
         // Generate random station network
@@ -2035,281 +1606,16 @@
         
         // Visualize fault and stations on spatial setup panel
         function visualizeSpatialMap() {
-            const hypoLat = parseFloat(document.getElementById('hypo-lat').value);
-            const hypoLon = parseFloat(document.getElementById('hypo-lon').value);
-            
-            // Check if we have stations
-            if (!window.stationsData || window.stationsData.length === 0) {
-                return;
-            }
-            
-            // Get hypocenter position from kinematics if available
-            const hypoAlong = window.globalKinematicsResult ? window.globalKinematicsResult.hypo_along : 0.5;
-            const hypoDown = window.globalKinematicsResult ? window.globalKinematicsResult.hypo_down : 0.5;
-            
-            // Prepare traces
-            const traces = [];
-            
-            // Add fault trace
-            if (window.isGeoJSONMode && window.geojsonPatches) {
-                // Use GeoJSON fault geometry - show actual rupture with slip distribution
-                const patches = window.geojsonPatches;
-                const patchLons = patches.map(p => p.centroid_lon);
-                const patchLats = patches.map(p => p.centroid_lat);
-                const patchSlip = patches.map(p => p.slip);
-                const patchMoment = patches.map(p => p.moment);
-                
-                // Create slip distribution trace - main rupture visualization
-                const maxSlip = Math.max(...patchSlip);
-                const minSlip = Math.min(...patchSlip.filter(s => s > 0));
-                
-                // Create hover text with detailed patch information
-                const patchHoverText = patches.map(p => 
-                    `Slip: ${p.slip.toFixed(3)} m<br>` +
-                    `Moment: ${p.moment.toExponential(2)} N·m<br>` +
-                    `Lat: ${p.centroid_lat.toFixed(4)}°<br>` +
-                    `Lon: ${p.centroid_lon.toFixed(4)}°<br>` +
-                    `Depth: ${p.depth.toFixed(1)} km<br>` +
-                    `Rupture Time: ${p.rupture_time.toFixed(2)} s`
-                );
-                
-                traces.push({
-                    type: 'scattermapbox',
-                    mode: 'markers',
-                    lon: patchLons,
-                    lat: patchLats,
-                    marker: {
-                        size: 12,
-                        color: patchSlip,
-                        colorscale: 'Hot',
-                        cmin: 0,
-                        cmax: maxSlip,
-                        showscale: true,
-                        colorbar: {
-                            title: {
-                                text: 'Slip (m)',
-                                side: 'right'
-                            },
-                            thickness: 15,
-                            len: 0.7,
-                            x: 1.02,
-                            y: 0.5
-                        },
-                        line: {
-                            color: 'rgba(0, 0, 0, 0.3)',
-                            width: 1
-                        }
-                    },
-                    hovertext: patchHoverText,
-                    hoverinfo: 'text',
-                    name: 'Fault Rupture',
-                    showlegend: true
-                });
-                
-                // Add fault outline (boundary of all patches)
-                const outlineLons = [...new Set(patchLons)].sort((a, b) => a - b);
-                const outlineLats = [...new Set(patchLats)].sort((a, b) => a - b);
-                
-                // Create a simple bounding box for the fault
-                if (outlineLons.length > 1 && outlineLats.length > 1) {
-                    const minLon = Math.min(...outlineLons);
-                    const maxLon = Math.max(...outlineLons);
-                    const minLat = Math.min(...outlineLats);
-                    const maxLat = Math.max(...outlineLats);
-                    
-                    traces.push({
-                        type: 'scattermapbox',
-                        mode: 'lines',
-                        lon: [minLon, maxLon, maxLon, minLon, minLon],
-                        lat: [minLat, minLat, maxLat, maxLat, minLat],
-                        line: {
-                            color: 'rgba(255, 0, 0, 0.8)',
-                            width: 3
-                        },
-                        name: 'Fault Outline',
-                        hoverinfo: 'skip',
-                        showlegend: false
-                    });
+            // In new layout: update Leaflet map with fault projection + station markers
+            updateMapProjection();
+            if (window.stationsData && window.stationsData.length > 0) {
+                updateMapWithStations(window.stationsData);
+                // Fit map to show all stations + fault
+                if (leafletMap && stationLayerGroup) {
+                    const group = L.featureGroup([stationLayerGroup, ...(faultPolygon ? [faultPolygon] : [])]);
+                    try { leafletMap.fitBounds(group.getBounds().pad(0.2)); } catch(e) {}
                 }
-            } else {
-                // Use synthetic fault geometry with actual hypocenter position
-                const strike = parseFloat(document.getElementById('strike').value);
-                const length = faultData.length;
-                const width = faultData.width;
-                const dip = faultData.dip;
-                const strikeRad = strike * Math.PI / 180;
-                const dipRad = dip * Math.PI / 180;
-                
-                // Calculate all 4 projected corners of the fault plane
-                const halfLength = length / 2;
-                const deltaLat1 = (halfLength * Math.cos(strikeRad)) / 111.0;
-                const deltaLon1 = (halfLength * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
-
-                // Down-dip horizontal projection
-                const perpRad2 = strikeRad - Math.PI / 2;
-                const horizontalDip2 = width * Math.cos(dipRad);
-                const dipOffsetLat = (horizontalDip2 * Math.cos(perpRad2)) / 111.0;
-                const dipOffsetLon = (horizontalDip2 * Math.sin(perpRad2)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
-
-                // 4 corners: top-start, top-end, bottom-end, bottom-start, close
-                const fc0lat = hypoLat - deltaLat1,  fc0lon = hypoLon - deltaLon1;
-                const fc1lat = hypoLat + deltaLat1,  fc1lon = hypoLon + deltaLon1;
-                const fc2lat = fc1lat + dipOffsetLat, fc2lon = fc1lon + dipOffsetLon;
-                const fc3lat = fc0lat + dipOffsetLat, fc3lon = fc0lon + dipOffsetLon;
-
-                traces.push({
-                    type: 'scattermapbox',
-                    mode: 'lines',
-                    lon: [fc0lon, fc1lon, fc2lon, fc3lon, fc0lon],
-                    lat: [fc0lat, fc1lat, fc2lat, fc3lat, fc0lat],
-                    line: { color: 'rgba(220,50,50,0.9)', width: 3 },
-                    name: 'Fault Projection',
-                    hovertemplate: 'Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra>Fault</extra>',
-                    showlegend: true
-                });
-
-                // Build GeoJSON polygon for fault fill (added as mapbox layer below)
-                window._faultPolygonGeoJSON = {
-                    type: 'FeatureCollection',
-                    features: [{ type: 'Feature', geometry: {
-                        type: 'Polygon',
-                        coordinates: [[[fc0lon,fc0lat],[fc1lon,fc1lat],[fc2lon,fc2lat],[fc3lon,fc3lat],[fc0lon,fc0lat]]]
-                    }}]
-                };
-
-                // Calculate actual hypocenter position
-                const alongStrikeDist = (hypoAlong - 0.5) * length;
-                const downDipDist = hypoDown * width;
-                
-                const hypoLatOffset = (alongStrikeDist * Math.cos(strikeRad)) / 111.0;
-                const hypoLonOffset = (alongStrikeDist * Math.sin(strikeRad)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
-                
-                const perpStrike = strikeRad - Math.PI / 2;
-                const horizontalDownDip = downDipDist * Math.cos(dipRad);
-                const hypoLatOffsetDip = (horizontalDownDip * Math.cos(perpStrike)) / 111.0;
-                const hypoLonOffsetDip = (horizontalDownDip * Math.sin(perpStrike)) / (111.0 * Math.cos(hypoLat * Math.PI / 180));
-                
-                const actualHypoLat = hypoLat + hypoLatOffset + hypoLatOffsetDip;
-                const actualHypoLon = hypoLon + hypoLonOffset + hypoLonOffsetDip;
-                const actualHypoDepth = downDipDist * Math.sin(dipRad);
-                
-                // Add actual hypocenter marker
-                traces.push({
-                    type: 'scattermapbox',
-                    mode: 'markers',
-                    lon: [actualHypoLon],
-                    lat: [actualHypoLat],
-                    marker: { size: 18, color: '#FFD700' },
-                    name: '⭐ Hypocenter',
-                    hovertemplate: `Hypocenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<br>Depth: ${actualHypoDepth.toFixed(1)} km<extra></extra>`,
-                    showlegend: true
-                });
             }
-            
-            // Don't add a separate epicenter marker if we already added hypocenter above
-            if (!(window.globalKinematicsResult && !window.isGeoJSONMode)) {
-                // Add generic epicenter marker for GeoJSON mode
-                traces.push({
-                    type: 'scattermapbox',
-                    mode: 'markers',
-                    lon: [hypoLon],
-                    lat: [hypoLat],
-                    marker: { size: 18, color: '#FFD700' },
-                    name: '⭐ Epicenter',
-                    hovertemplate: 'Epicenter<br>Lat: %{lat:.4f}°<br>Lon: %{lon:.4f}°<extra></extra>',
-                    showlegend: true
-                });
-            }
-            
-            // Add station markers
-            const validStations = window.stationsData.filter(s => 
-                s.lat !== undefined && !isNaN(s.lat) && 
-                s.lon !== undefined && !isNaN(s.lon)
-            );
-            
-            const stationLats = validStations.map(s => s.lat);
-            const stationLons = validStations.map(s => s.lon);
-            const stationNames = validStations.map(s => s.name);
-            
-            const hoverText = validStations.map(s => {
-                let text = `<b>${s.name}</b><br>Lat: ${s.lat.toFixed(4)}°<br>Lon: ${s.lon.toFixed(4)}°`;
-                if (s.distance !== undefined) {
-                    text += `<br>Distance: ${s.distance.toFixed(1)} km`;
-                }
-                if (s.vs30 !== undefined) {
-                    text += `<br>Vs30: ${s.vs30.toFixed(0)} m/s`;
-                }
-                return text;
-            });
-            
-            traces.push({
-                type: 'scattermapbox',
-                mode: 'markers',
-                lon: stationLons,
-                lat: stationLats,
-                marker: {
-                    size: 10,
-                    color: '#00CED1'
-                },
-                hovertext: hoverText,
-                hoverinfo: 'text',
-                name: `▲ Stations (${stationLats.length})`,
-                showlegend: true
-            });
-            
-            // Calculate map bounds
-            const allLats = [...stationLats, hypoLat].filter(v => v !== undefined && !isNaN(v));
-            const allLons = [...stationLons, hypoLon].filter(v => v !== undefined && !isNaN(v));
-            
-            if (window.isGeoJSONMode && window.geojsonPatches) {
-                allLats.push(...window.geojsonPatches.map(p => p.centroid_lat).filter(v => v !== undefined && !isNaN(v)));
-                allLons.push(...window.geojsonPatches.map(p => p.centroid_lon).filter(v => v !== undefined && !isNaN(v)));
-            }
-            
-            // Default to hypocenter if no valid coordinates
-            const centerLat = allLats.length > 0 ? (Math.max(...allLats) + Math.min(...allLats)) / 2 : (hypoLat || 0);
-            const centerLon = allLons.length > 0 ? (Math.max(...allLons) + Math.min(...allLons)) / 2 : (hypoLon || 0);
-            
-            // Build title based on mode
-            let mapTitle = 'Fault & Stations Map';
-            if (window.isGeoJSONMode && window.eventMetadata) {
-                mapTitle = `${window.eventMetadata.eventid} - Mw ${window.eventMetadata.magnitude} ${window.eventMetadata.location}`;
-            }
-            
-            const mapboxLayers = [];
-            if (window._faultPolygonGeoJSON) {
-                mapboxLayers.push({
-                    sourcetype: 'geojson',
-                    source: window._faultPolygonGeoJSON,
-                    type: 'fill',
-                    color: 'rgba(220,50,50,0.20)'
-                });
-            }
-
-            const layout = {
-                title: {
-                    text: mapTitle,
-                    font: { size: 14, color: '#1f2937' }
-                },
-                mapbox: {
-                    style: 'open-street-map',
-                    center: { lat: centerLat, lon: centerLon },
-                    zoom: 7,
-                    layers: mapboxLayers
-                },
-                showlegend: true,
-                legend: {
-                    x: 0.01, y: 0.99,
-                    xanchor: 'left', yanchor: 'top',
-                    bgcolor: 'rgba(255,255,255,0.9)',
-                    bordercolor: 'rgba(0,0,0,0.2)',
-                    borderwidth: 1,
-                    font: { size: 11 }
-                },
-                margin: {l: 0, r: 0, t: 35, b: 0}
-            };
-            
-            Plotly.newPlot('plot-container', traces, layout, {responsive: true});
         }
         
         // Update visualization based on dropdown selection
@@ -2327,116 +1633,14 @@
             }
         }
         
-        // Back to geometry panel
+        // Back to geometry panel — in new layout the overlay chevron handles navigation
         function backToGeometry() {
-            // Check which panel is currently visible
-            const waveformsVisible = document.getElementById('waveforms-panel').style.transform === 'translateX(0px)';
-            const spatialVisible = document.getElementById('spatial-panel').style.transform === 'translateX(0px)';
-            const subsourcesVisible = document.getElementById('subsources-panel').style.transform === 'translateX(0px)';
-            
-            if (waveformsVisible) {
-                // Go back to spatial from waveforms
-                document.getElementById('waveforms-panel').style.transform = 'translateX(100%)';
-                document.getElementById('spatial-panel').style.transform = 'translateX(0)';
-                
-                // Update button text
-                document.getElementById('back-button-text').textContent = 'Back to Subsources';
-                
-                // Update progress back to step 4
-                updateProgressSteps(4);
-            } else if (spatialVisible) {
-                // Go back to subsources from spatial
-                document.getElementById('spatial-panel').style.transform = 'translateX(100%)';
-                document.getElementById('subsources-panel').style.transform = 'translateX(0)';
-                
-                // Show subsources button, hide spatial button
-                document.getElementById('proceed-network-btn').classList.remove('hidden');
-                
-                // Update button text
-                document.getElementById('back-button-text').textContent = 'Back to Kinematics';
-                
-                // Visualize subsources
-                visualizeSubsources();
-                
-                // Update progress back to step 3
-                updateProgressSteps(3);
-            } else if (subsourcesVisible) {
-                // Go back to kinematics from subsources
-                document.getElementById('subsources-panel').style.transform = 'translateX(100%)';
-                document.getElementById('kinematics-panel').style.transform = 'translateX(0)';
-                
-                // Show kinematics controls and subsources button
-                document.getElementById('kinematics-controls').classList.remove('hidden');
-                document.getElementById('compute-kinematics-btn').classList.remove('hidden');
-                document.getElementById('proceed-subsources-btn').classList.remove('hidden');
-                
-                // Hide spatial button
-                document.getElementById('proceed-network-btn').classList.add('hidden');
-                
-                // Restore button text
-                document.getElementById('back-button-text').textContent = 'Back to Geometry';
-                
-                // Restore kinematics visualization
-                updateKinematicsVisualization();
-                
-                // Update progress back to step 2
-                updateProgressSteps(2);
-            } else {
-                // Go back to geometry from kinematics
-                document.getElementById('geometry-panel').style.transform = 'translateX(0)';
-                document.getElementById('kinematics-panel').style.transform = 'translateX(100%)';
-                
-                // Show confirm geometry button and hide back button
-                document.getElementById('confirm-geometry-btn').classList.remove('hidden');
-                document.getElementById('back-to-geometry-btn').classList.add('hidden');
-                document.getElementById('compute-kinematics-btn').classList.add('hidden');
-                
-                // Show geometry tab again
-                document.getElementById('tab-geometry').classList.remove('hidden');
-                
-                // Hide kinematics controls
-                document.getElementById('kinematics-controls').classList.add('hidden');
-                
-                // Hide subsources and spatial buttons
-                document.getElementById('proceed-subsources-btn').classList.add('hidden');
-                document.getElementById('proceed-network-btn').classList.add('hidden');
-                
-                // Switch back to geometry visualization
-                switchTab('geometry');
-                previewGeometry();
-                
-                // Update progress back to step 1
-                updateProgressSteps(1);
-            }
+            closeFaultPlaneOverlay();
         }
         
         // Go back to landing page
         function goHome() {
-            // Hide workspace, show landing page
-            document.getElementById('landing-page').classList.remove('hidden');
-            document.getElementById('workspace').classList.add('hidden');
-            
-            // Reset panels
-            document.getElementById('geometry-panel').style.transform = 'translateX(0)';
-            document.getElementById('kinematics-panel').style.transform = 'translateX(100%)';
-            document.getElementById('subsources-panel').style.transform = 'translateX(100%)';
-            document.getElementById('spatial-panel').style.transform = 'translateX(100%)';
-            document.getElementById('waveforms-panel').style.transform = 'translateX(100%)';
-            
-            // Hide footer buttons
-            document.getElementById('confirm-geometry-btn').classList.add('hidden');
-            document.getElementById('back-to-geometry-btn').classList.add('hidden');
-            document.getElementById('compute-kinematics-btn').classList.add('hidden');
-            document.getElementById('proceed-subsources-btn').classList.add('hidden');
-            document.getElementById('proceed-network-btn').classList.add('hidden');
-            
-            // Hide kinematics controls
-            document.getElementById('kinematics-controls').classList.add('hidden');
-            
-            // Hide progress steps
-            document.getElementById('progress-steps').classList.add('hidden');
-            
-            currentMode = null;
+            resetApplication();
         }
         
         // Preview geometry before confirmation
@@ -2509,8 +1713,7 @@
                 hypoDown: 0.5
             };
             
-            switchTab('geometry');
-            visualize('geometry');
+            updateMapProjection();
         }
 
         // Generate synthetic fault with full parameters
@@ -3570,41 +2773,36 @@
                 console.log(`   Avg Slip: ${avgSlip.toFixed(3)} m`);
                 
                 // Go directly to subsources panel (skip geometry and kinematics - they're read-only from GeoJSON)
-                document.getElementById('geometry-panel').style.transform = 'translateX(-100%)';
-                document.getElementById('kinematics-panel').style.transform = 'translateX(-100%)';
-                document.getElementById('subsources-panel').style.transform = 'translateX(0%)';
-                document.getElementById('spatial-panel').style.transform = 'translateX(100%)';
+                // Show fault-plane overlay at subsources tab (GeoJSON mode)
+                showFaultPlaneOverlay();
+                switchFaultTab('slip');
                 
                 // Update progress to step 3 (Subsources)
                 updateProgressSteps(3);
                 
                 // Add GeoJSON read-only banner to subsources panel
-                const subsourcesPanel = document.getElementById('subsources-panel');
-                const existingBanner = subsourcesPanel.querySelector('.geojson-banner');
-                if (!existingBanner) {
+                const subsourcesPanel = document.getElementById('subsource-section');
+                const existingBanner = subsourcesPanel ? subsourcesPanel.querySelector('.geojson-banner') : null;
+                if (subsourcesPanel && !existingBanner) {
                     const banner = document.createElement('div');
-                    banner.className = 'geojson-banner bg-blue-50 border border-blue-300 rounded-lg p-4 mb-4 mx-6';
+                    banner.className = 'geojson-banner bg-blue-50 border border-blue-300 rounded-lg p-3 mb-3 text-xs';
                     banner.innerHTML = `
                         <div class="flex items-start">
-                            <i class="fas fa-info-circle text-blue-600 mt-1 mr-3"></i>
+                            <i class="fas fa-info-circle text-blue-600 mt-0.5 mr-2"></i>
                             <div>
-                                <h4 class="font-semibold text-blue-900 mb-1">GeoJSON Fault Data Loaded</h4>
-                                <p class="text-sm text-blue-800">
-                                    Event: <strong>${window.eventMetadata.eventid}</strong> - ${window.eventMetadata.location}<br>
-                                    The fault geometry, kinematics, rake, moment distribution, and rupture velocity are defined in the GeoJSON file and cannot be modified.<br>
-                                    Review the visualization below, then proceed to configure stations.
-                                </p>
+                                <strong class="text-blue-900">GeoJSON Fault Data Loaded</strong><br>
+                                <span class="text-blue-800">Event: <strong>${window.eventMetadata.eventid}</strong> — ${window.eventMetadata.location}.<br>
+                                Geometry, kinematics and rake are read-only.</span>
                             </div>
                         </div>
                     `;
-                    subsourcesPanel.querySelector('.p-6').insertBefore(banner, subsourcesPanel.querySelector('.p-6').firstChild);
+                    subsourcesPanel.insertBefore(banner, subsourcesPanel.firstChild);
                 }
                 
                 // Update grouping controls and visualization
                 updateSubsourceGrouping();
                 
-                // Update back button text
-                document.getElementById('back-button-text').textContent = 'Back to Start';
+                // (back navigation handled by closeFaultPlaneOverlay)
                 
                 // Populate fault location with epicenter
                 document.getElementById('hypo-lat').value = window.eventMetadata.epicenter_lat;
@@ -3935,13 +3133,11 @@
                 return;
             }
             
-            // Slide to waveforms panel
-            document.getElementById('spatial-panel').style.transform = 'translateX(-100%)';
-            document.getElementById('waveforms-panel').style.transform = 'translateX(0)';
+            // Show results overlay
+            showResultsOverlay();
             
-            // Hide view button, update back button
+            // Hide view button
             document.getElementById('view-waveforms-btn').classList.add('hidden');
-            document.getElementById('back-button-text').textContent = 'Back to Spatial Setup';
             
             // Update progress to step 5
             updateProgressSteps(5);
@@ -4027,7 +3223,7 @@
         
         // Display waveform plots
         function displayWaveformPlots() {
-            const plotContainer = document.getElementById('plot-container');
+            const plotContainer = document.getElementById('plot-container-results');
             plotContainer.innerHTML = '';
             plotContainer.style.backgroundColor = '#ffffff';
             
@@ -4093,7 +3289,8 @@
             
             plotContainer.appendChild(gallery);
 
-            renderShakemapStationMap();
+            // Ensure results overlay is visible before rendering map
+            setTimeout(() => renderShakemapStationMap(), 100);
         }
 
         function parseDetailedAnalysisRows() {
