@@ -105,7 +105,7 @@
         </div>
         <button onclick="goHome()" class="text-white/50 hover:text-white transition text-xs flex items-center gap-1"><i class="fas fa-home"></i></button>
       </div>
-      <p class="text-xs text-blue-200 mt-0.5">Set location, geometry and kinematics</p>
+      <p class="text-xs text-blue-200 mt-0.5">Set location &amp; geometry</p>
     </div>
 
     <div id="geojson-inputs" class="hidden px-4 py-4 border-b">
@@ -168,55 +168,12 @@
         </div>
       </div>
 
-      <!-- Kinematics -->
-      <div class="px-4 py-3">
-        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5"><i class="fas fa-bolt text-yellow-500"></i>Kinematics</h4>
-        <div class="space-y-2.5">
-          <div>
-            <div class="flex justify-between items-center mb-1">
-              <label class="text-xs text-gray-600">Rake (°)</label>
-              <input type="number" id="rake-val" min="-180" max="180" value="90" class="w-14 px-1.5 py-1 border border-gray-200 rounded text-xs text-center font-mono" oninput="syncSlider('rake'); updateRakeMechanism()">
-            </div>
-            <input type="range" id="rake" min="-180" max="180" value="90" oninput="updateValue('rake'); updateRakeMechanism()" class="w-full">
-            <div id="rake-mechanism" class="text-xs text-indigo-500 mt-0.5 font-medium">Reverse/Thrust fault</div>
-          </div>
-          <div>
-            <div class="flex justify-between items-center mb-1">
-              <label class="text-xs text-gray-600" id="magnitude-label">Magnitude (Mw)</label>
-              <input type="number" id="magnitude-val" min="5.0" max="9.0" step="0.1" value="7.0" class="w-14 px-1.5 py-1 border border-gray-200 rounded text-xs text-center font-mono" oninput="syncSlider('magnitude')">
-            </div>
-            <input type="range" id="magnitude" min="5.0" max="9.0" step="0.1" value="7.0" oninput="updateValue('magnitude')" class="w-full">
-            <p id="magnitude-info" class="text-xs text-blue-500 mt-0.5 hidden"></p>
-          </div>
-          <div>
-            <label class="text-xs text-gray-600 block mb-1">Slip Distribution</label>
-            <select id="slip-dist" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:ring-1 focus:ring-indigo-400 focus:outline-none">
-              <option value="uniform">Uniform</option>
-              <option value="random">Random</option>
-              <option value="gaussian" selected>Gaussian</option>
-              <option value="asperity">Asperity</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs text-gray-600 block mb-1">Along-strike hypo: <span id="hypo-along-value" class="text-indigo-600 font-mono font-semibold">0.50</span></label>
-            <input type="range" id="hypo-along" min="0" max="1" step="0.01" value="0.5" class="w-full" oninput="document.getElementById('hypo-along-value').textContent=parseFloat(this.value).toFixed(2)">
-          </div>
-          <div>
-            <label class="text-xs text-gray-600 block mb-1">Down-dip hypo: <span id="hypo-down-value" class="text-indigo-600 font-mono font-semibold">0.50</span></label>
-            <input type="range" id="hypo-down" min="0" max="1" step="0.01" value="0.5" class="w-full" oninput="document.getElementById('hypo-down-value').textContent=parseFloat(this.value).toFixed(2)">
-          </div>
-          <div>
-            <label class="text-xs text-gray-600 block mb-1">Rupture velocity: <span id="rupture-vel-value" class="text-indigo-600 font-mono font-semibold">3.0</span> km/s</label>
-            <input type="range" id="rupture-vel" min="1.5" max="4.5" step="0.1" value="3.0" class="w-full" oninput="document.getElementById('rupture-vel-value').textContent=parseFloat(this.value).toFixed(1)">
-          </div>
-        </div>
-      </div>
 
     </div>
-    <!-- Sticky compute button -->
+    <!-- Confirm Geometry button -->
     <div id="fault-panel-footer" class="hidden" style="position:absolute; bottom:0; left:0; right:0; padding:12px 16px; background:white; border-top:1px solid #e5e7eb; box-shadow:0 -4px 12px rgba(0,0,0,0.08);">
-      <button onclick="runKinematics()" class="w-full py-2.5 rounded-xl font-bold text-white text-sm transition shadow-lg" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
-        <i class="fas fa-bolt mr-2"></i>Compute Kinematics
+      <button onclick="confirmGeometryAndShowStations()" class="w-full py-2.5 rounded-xl font-bold text-white text-sm transition shadow-lg" style="background:linear-gradient(135deg,#1e3a5f,#4f46e5);">
+        <i class="fas fa-broadcast-tower mr-2"></i>Confirm Geometry &amp; Set Stations
       </button>
     </div>
   </div>
@@ -229,14 +186,14 @@
           <i class="fas fa-broadcast-tower text-base text-green-300"></i>
           <span class="font-bold text-sm">Station Network</span>
         </div>
-        <button onclick="backToFaultPlane()" class="text-white/50 hover:text-white transition text-xs flex items-center gap-1"><i class="fas fa-arrow-left"></i><span>Back</span></button>
+        <button onclick="backFromSpatialPanel()" class="text-white/50 hover:text-white transition text-xs flex items-center gap-1"><i class="fas fa-arrow-left"></i><span>Back</span></button>
       </div>
-      <p class="text-xs text-green-200 mt-0.5">Configure stations and compute waveforms</p>
+      <p class="text-xs text-green-200 mt-0.5">Configure stations, then set kinematics &amp; compute waveforms</p>
     </div>
 
     <div class="flex-1 overflow-y-auto panel-scroll" style="padding-bottom:76px;">
 
-      <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs text-gray-500">
+      <div id="station-header-section" class="px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs text-gray-500">
         <div class="grid grid-cols-3 gap-1">
           <div><span class="block text-gray-400">Lat</span><span id="spatial-hypo-lat-display" class="font-mono font-semibold text-gray-700">45.000°</span></div>
           <div><span class="block text-gray-400">Lon</span><span id="spatial-hypo-lon-display" class="font-mono font-semibold text-gray-700">15.000°</span></div>
@@ -244,7 +201,7 @@
         </div>
       </div>
 
-      <div class="px-4 py-3 border-b border-gray-100">
+      <div id="station-setup-content" class="px-4 py-3 border-b border-gray-100">
         <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">Generate Stations</h4>
         <div class="space-y-2.5">
           <div>
@@ -313,7 +270,10 @@
 
     </div>
     <div style="position:absolute; bottom:0; left:0; right:0; padding:12px 16px; background:white; border-top:1px solid #e5e7eb; box-shadow:0 -4px 12px rgba(0,0,0,0.08);">
-      <button onclick="computeWaveforms()" class="w-full py-2.5 rounded-xl font-bold text-white text-sm transition shadow-lg" style="background:linear-gradient(135deg,#059669,#0284c7);">
+      <button id="btn-to-kinematics" onclick="proceedToKinematics()" class="w-full py-2.5 rounded-xl font-bold text-white text-sm transition shadow-lg" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
+        <i class="fas fa-bolt mr-2"></i>Set Kinematics →
+      </button>
+      <button id="btn-compute-waveforms" onclick="computeWaveforms()" class="hidden w-full py-2.5 rounded-xl font-bold text-white text-sm transition shadow-lg mt-2" style="background:linear-gradient(135deg,#059669,#0284c7);">
         <i class="fas fa-calculator mr-2"></i>Compute Waveforms
       </button>
     </div>
@@ -324,8 +284,8 @@
 
     <!-- Top bar -->
     <div style="background:#1e293b; padding:10px 18px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; border-bottom:1px solid rgba(255,255,255,0.07);">
-      <button onclick="closeFaultPlaneOverlay()" class="flex items-center gap-1.5 text-slate-400 hover:text-white transition text-xs">
-        <i class="fas fa-chevron-down"></i>&nbsp;Map
+      <button onclick="backFromFaultPlane()" class="flex items-center gap-1.5 text-slate-400 hover:text-white transition text-xs">
+        <i class="fas fa-chevron-down"></i>&nbsp;Stations
       </button>
       <div class="flex rounded-lg overflow-hidden border border-slate-600 text-xs">
         <button onclick="switchFaultTab('slip')" id="tab-slip" class="fault-tab-btn active px-3 py-1.5 bg-slate-700 text-white font-medium">Slip</button>
@@ -340,8 +300,67 @@
       </div>
     </div>
 
-    <!-- Fault plane Plotly chart -->
-    <div id="plot-container" style="flex:1; min-height:0; overflow:hidden;"></div>
+    <!-- Kinematics sidebar + Fault plane chart -->
+    <div style="flex:1; min-height:0; display:flex; flex-direction:row; overflow:hidden;">
+
+      <!-- Kinematics controls sidebar -->
+      <div id="kinematics-sidebar" style="width:230px; flex-shrink:0; overflow-y:auto; background:#1e293b; border-right:1px solid rgba(255,255,255,0.07); padding:12px 14px; display:flex; flex-direction:column; gap:10px;">
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-700">
+          <i class="fas fa-bolt text-yellow-400"></i>Kinematics
+        </div>
+        <!-- Rake -->
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="text-xs text-slate-300">Rake (°)</label>
+            <input type="number" id="rake-val" min="-180" max="180" value="90" class="w-14 px-1.5 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-center font-mono text-white focus:ring-1 focus:ring-indigo-400 focus:outline-none" oninput="syncSlider('rake'); updateRakeMechanism()">
+          </div>
+          <input type="range" id="rake" min="-180" max="180" value="90" oninput="updateValue('rake'); updateRakeMechanism()" class="w-full">
+          <div id="rake-mechanism" class="text-xs text-indigo-400 mt-0.5 font-medium">Reverse/Thrust fault</div>
+        </div>
+        <!-- Magnitude -->
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="text-xs text-slate-300" id="magnitude-label">Magnitude (Mw)</label>
+            <input type="number" id="magnitude-val" min="5.0" max="9.0" step="0.1" value="7.0" class="w-14 px-1.5 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-center font-mono text-white focus:ring-1 focus:ring-indigo-400 focus:outline-none" oninput="syncSlider('magnitude')">
+          </div>
+          <input type="range" id="magnitude" min="5.0" max="9.0" step="0.1" value="7.0" oninput="updateValue('magnitude')" class="w-full">
+          <p id="magnitude-info" class="text-xs text-blue-400 mt-0.5 hidden"></p>
+        </div>
+        <!-- Slip Distribution -->
+        <div>
+          <label class="text-xs text-slate-300 block mb-1">Slip Distribution</label>
+          <select id="slip-dist" class="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-xs text-white focus:ring-1 focus:ring-indigo-400 focus:outline-none">
+            <option value="uniform">Uniform</option>
+            <option value="random">Random</option>
+            <option value="gaussian" selected>Gaussian</option>
+            <option value="asperity">Asperity</option>
+          </select>
+        </div>
+        <!-- Along-strike hypo -->
+        <div>
+          <label class="text-xs text-slate-300 block mb-1">Along-strike hypo: <span id="hypo-along-value" class="text-indigo-300 font-mono font-semibold">0.50</span></label>
+          <input type="range" id="hypo-along" min="0" max="1" step="0.01" value="0.5" class="w-full" oninput="document.getElementById('hypo-along-value').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+        <!-- Down-dip hypo -->
+        <div>
+          <label class="text-xs text-slate-300 block mb-1">Down-dip hypo: <span id="hypo-down-value" class="text-indigo-300 font-mono font-semibold">0.50</span></label>
+          <input type="range" id="hypo-down" min="0" max="1" step="0.01" value="0.5" class="w-full" oninput="document.getElementById('hypo-down-value').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+        <!-- Rupture velocity -->
+        <div>
+          <label class="text-xs text-slate-300 block mb-1">Rupture vel: <span id="rupture-vel-value" class="text-indigo-300 font-mono font-semibold">3.0</span> km/s</label>
+          <input type="range" id="rupture-vel" min="1.5" max="4.5" step="0.1" value="3.0" class="w-full" oninput="document.getElementById('rupture-vel-value').textContent=parseFloat(this.value).toFixed(1)">
+        </div>
+        <!-- Compute button -->
+        <button onclick="computeKinematics()" class="mt-auto w-full py-2 rounded-xl font-bold text-white text-xs transition shadow" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
+          <i class="fas fa-bolt mr-1.5"></i>Compute Kinematics
+        </button>
+      </div>
+
+      <!-- Fault plane Plotly chart -->
+      <div id="plot-container" style="flex:1; min-height:0; overflow:hidden;"></div>
+
+    </div>
 
     <!-- Source grouping section -->
     <div id="subsource-section" style="background:#1e293b; border-top:1px solid rgba(255,255,255,0.07); padding:12px 18px; flex-shrink:0;">
@@ -364,8 +383,8 @@
 
     <!-- Proceed bar -->
     <div style="background:#0f172a; padding:10px 18px; display:flex; justify-content:flex-end; flex-shrink:0; border-top:1px solid rgba(255,255,255,0.05);">
-      <button id="proceed-subsources-btn" onclick="acceptGroupingAndProceed()" class="hidden px-5 py-2 rounded-xl font-bold text-white text-xs transition" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);">
-        <i class="fas fa-layer-group mr-1.5"></i>Accept & Set Up Stations
+      <button id="proceed-subsources-btn" onclick="acceptGroupingAndProceed()" class="hidden px-5 py-2 rounded-xl font-bold text-white text-xs transition" style="background:linear-gradient(135deg,#059669,#0284c7);">
+        <i class="fas fa-check mr-1.5"></i>Accept &amp; Compute Waveforms
       </button>
     </div>
   </div>
@@ -533,16 +552,17 @@
         // ══════════════════════════════════════════════════════
         //  OVERLAY MANAGEMENT
         // ══════════════════════════════════════════════════════
+        let spatialPanelMode = 'stations'; // 'stations' | 'waveforms'
+
         function showFaultPlaneOverlay() {
-            document.getElementById('fault-panel').classList.add('hidden');
+            document.getElementById('spatial-setup-panel').classList.add('hidden');
             requestAnimationFrame(() => {
-                document.getElementById('fault-plane-overlay').style.height = '82vh';
+                document.getElementById('fault-plane-overlay').style.height = '88vh';
             });
         }
 
         function closeFaultPlaneOverlay() {
             document.getElementById('fault-plane-overlay').style.height = '0';
-            document.getElementById('fault-panel').classList.remove('hidden');
         }
 
         function showResultsOverlay() {
@@ -554,12 +574,53 @@
 
         function closeResultsOverlay() {
             document.getElementById('results-overlay').style.height = '0';
+            setSpatialPanelMode(spatialPanelMode);
+        }
+
+        function setSpatialPanelMode(mode) {
+            spatialPanelMode = mode;
+            const stationContent = document.getElementById('station-setup-content');
+            const wfConfig = document.getElementById('waveform-config');
+            const btnKin = document.getElementById('btn-to-kinematics');
+            const btnWave = document.getElementById('btn-compute-waveforms');
+            const stationHeaderSection = document.getElementById('station-header-section');
+            if (mode === 'stations') {
+                if (stationContent) stationContent.classList.remove('hidden');
+                if (stationHeaderSection) stationHeaderSection.classList.remove('hidden');
+                if (wfConfig) wfConfig.classList.add('hidden');
+                if (btnKin) btnKin.classList.remove('hidden');
+                if (btnWave) btnWave.classList.add('hidden');
+            } else {
+                if (stationContent) stationContent.classList.add('hidden');
+                if (stationHeaderSection) stationHeaderSection.classList.add('hidden');
+                if (wfConfig) wfConfig.classList.remove('hidden');
+                if (btnKin) btnKin.classList.add('hidden');
+                if (btnWave) btnWave.classList.remove('hidden');
+            }
             document.getElementById('spatial-setup-panel').classList.remove('hidden');
         }
 
+        // Back from fault-plane overlay → go to stations panel
+        function backFromFaultPlane() {
+            closeFaultPlaneOverlay();
+            setSpatialPanelMode('stations');
+        }
+
+        // Back from spatial panel → depends on mode
+        function backFromSpatialPanel() {
+            if (spatialPanelMode === 'stations') {
+                document.getElementById('spatial-setup-panel').classList.add('hidden');
+                document.getElementById('fault-panel').classList.remove('hidden');
+                updateProgressSteps(1);
+            } else {
+                // waveform mode → back to fault-plane overlay
+                document.getElementById('spatial-setup-panel').classList.add('hidden');
+                document.getElementById('fault-plane-overlay').style.height = '88vh';
+            }
+        }
+
         function backToFaultPlane() {
-            document.getElementById('spatial-setup-panel').classList.add('hidden');
-            showFaultPlaneOverlay();
+            backFromSpatialPanel();
         }
 
         function switchFaultTab(tab) {
@@ -581,12 +642,54 @@
         // ══════════════════════════════════════════════════════
         //  WORKFLOW ENTRY POINTS
         // ══════════════════════════════════════════════════════
+
+        // Step 1 → Step 2: Confirm geometry, show stations panel
+        function confirmGeometryAndShowStations() {
+            previewGeometry();
+            updateMapProjection();
+            document.getElementById('fault-panel').classList.add('hidden');
+            setSpatialPanelMode('stations');
+            updateProgressSteps(2);
+            // Disable kinematics proceed until stations are generated
+            document.getElementById('btn-to-kinematics').disabled = true;
+            document.getElementById('btn-to-kinematics').style.opacity = '0.5';
+        }
+
+        // Step 2 → Step 3: Show fault-plane overlay for kinematics
+        function proceedToKinematics() {
+            // Suggest magnitude based on fault area
+            const area = (parseFloat(document.getElementById('length-val').value) || 100) *
+                         (parseFloat(document.getElementById('width-val').value) || 30);
+            const magRange = calculateMagnitudeRange(area);
+            const magSlider = document.getElementById('magnitude');
+            const magInput  = document.getElementById('magnitude-val');
+            magSlider.value = magRange.suggested.toFixed(1);
+            magInput.value  = magRange.suggested.toFixed(1);
+            const magInfo = document.getElementById('magnitude-info');
+            if (magInfo) {
+                magInfo.textContent = `Suggested Mw ${magRange.suggested.toFixed(1)} (Wells & Coppersmith 1994)`;
+                magInfo.classList.remove('hidden');
+            }
+            showFaultPlaneOverlay();
+            updateProgressSteps(3);
+        }
+
         function runKinematics() {
             computeKinematics();
         }
 
         function acceptGroupingAndProceed() {
-            proceedToSpatialSetup();
+            closeFaultPlaneOverlay();
+            // Update location summary
+            const lat = document.getElementById('hypo-lat').value;
+            const lon = document.getElementById('hypo-lon').value;
+            const str = document.getElementById('strike').value;
+            document.getElementById('spatial-hypo-lat-display').textContent = parseFloat(lat).toFixed(3) + '°';
+            document.getElementById('spatial-hypo-lon-display').textContent = parseFloat(lon).toFixed(3) + '°';
+            document.getElementById('spatial-strike-display').textContent = str + '°';
+            setSpatialPanelMode('waveforms');
+            updateMapProjection();
+            updateProgressSteps(5);
         }
 
         // Update progress steps indicator
@@ -678,6 +781,7 @@
             document.getElementById('map-click-hint').classList.add('hidden');
             document.getElementById('progress-steps').style.display = 'none';
             mapClickEnabled = false;
+            spatialPanelMode = 'stations';
 
             // Clear Leaflet map markers
             if (stationLayerGroup) stationLayerGroup.clearLayers();
@@ -886,8 +990,8 @@
                 };
             }
             
-            // Update progress to step 2
-            updateProgressSteps(2);
+            // Update progress to step 4 (kinematics computed)
+            updateProgressSteps(4);
             
             // Update computed summary display
             if (faultData) {
@@ -900,17 +1004,9 @@
             // Show the Accept & proceed button
             document.getElementById('proceed-subsources-btn').classList.remove('hidden');
             
-            // Fly map to fault bounds, then show fault-plane overlay
-            if (leafletMap && faultPolygon) {
-                leafletMap.flyToBounds(faultPolygon.getBounds().pad(0.4), { duration: 1.2 });
-            }
-            setTimeout(() => {
-                showFaultPlaneOverlay();
-                setTimeout(() => {
-                    switchFaultTab('slip');
-                    updateSubsourceGrouping();
-                }, 350);
-            }, 600);
+            // Visualize kinematics inline (already in fault-plane overlay)
+            switchFaultTab('slip');
+            updateSubsourceGrouping();
         }
         
         // Proceed to Subsources — in new layout grouping is inline in the overlay
@@ -1353,24 +1449,8 @@
         
         // Proceed to Spatial Setup
         function proceedToSpatialSetup() {
-            // Close fault plane overlay, show spatial setup panel
-            document.getElementById('fault-plane-overlay').style.height = '0';
-            document.getElementById('fault-panel').classList.add('hidden');
-
-            updateProgressSteps(4);
-
-            // Update the read-only location display in spatial panel
-            const lat = document.getElementById('hypo-lat').value;
-            const lon = document.getElementById('hypo-lon').value;
-            const str = document.getElementById('strike').value;
-            document.getElementById('spatial-hypo-lat-display').textContent = parseFloat(lat).toFixed(3) + '°';
-            document.getElementById('spatial-hypo-lon-display').textContent = parseFloat(lon).toFixed(3) + '°';
-            document.getElementById('spatial-strike-display').textContent = str + '°';
-
-            document.getElementById('spatial-setup-panel').classList.remove('hidden');
-
-            // Update Leaflet to show fault projection
-            updateMapProjection();
+            // Legacy: now handled by acceptGroupingAndProceed
+            acceptGroupingAndProceed();
         }
         
         // Update map with station markers
@@ -1597,8 +1677,9 @@
             }
             
             stationList.classList.remove('hidden');
-            // Show waveform configuration section now that stations are loaded
-            document.getElementById('waveform-config').classList.remove('hidden');
+            // Enable the kinematics button once stations are loaded
+            const btnKin = document.getElementById('btn-to-kinematics');
+            if (btnKin) { btnKin.disabled = false; btnKin.style.opacity = '1'; }
             
             // Update spatial map visualization in main panel
             visualizeSpatialMap();
